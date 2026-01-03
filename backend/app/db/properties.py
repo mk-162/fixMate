@@ -27,17 +27,22 @@ class Properties:
         row = await fetch_one(query, property_id)
         return dict(row) if row else None
 
-    async def get_by_org(self, org_id: int) -> List[Dict[str, Any]]:
-        """Get all properties for an organization."""
+    async def get_by_org(self, org_id: int, clerk_org_id: str = None) -> List[Dict[str, Any]]:
+        """Get all properties for an organization.
+
+        Supports both:
+        - org_id (integer FK to organizations table) - Railway model
+        - owner_id (Clerk org ID string) - Drizzle model
+        """
         query = """
-            SELECT p.*, 
-                   (SELECT COUNT(*) FROM tenants t WHERE t.property_id = p.id AND t.is_active = TRUE) as tenant_count,
-                   (SELECT COUNT(*) FROM issues i WHERE i.property_id = p.id AND i.status NOT IN ('closed', 'resolved_by_agent')) as active_issue_count
+            SELECT p.*,
+                   COALESCE((SELECT COUNT(*) FROM tenants t WHERE t.property_id = p.id AND (t.is_active = TRUE OR t.is_active IS NULL)), 0) as tenant_count,
+                   COALESCE((SELECT COUNT(*) FROM issues i WHERE i.property_id = p.id AND i.status NOT IN ('closed', 'resolved_by_agent')), 0) as active_issue_count
             FROM properties p
-            WHERE p.org_id = $1
+            WHERE p.org_id = $1 OR p.owner_id = $2
             ORDER BY p.name
         """
-        rows = await fetch_all(query, org_id)
+        rows = await fetch_all(query, org_id, clerk_org_id)
         return [dict(row) for row in rows]
 
     async def update(

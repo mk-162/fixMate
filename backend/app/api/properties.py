@@ -55,7 +55,8 @@ async def list_properties(
 ):
     """List all properties for the organization."""
     org_id = await get_org_id_from_header(x_clerk_org_id)
-    return await properties.get_by_org(org_id)
+    # Pass both org_id (Railway model) and clerk_org_id (Drizzle model)
+    return await properties.get_by_org(org_id, clerk_org_id=x_clerk_org_id)
 
 
 @router.get("/{property_id}")
