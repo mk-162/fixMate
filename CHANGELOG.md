@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/mk-162/fixMate/compare/v1.3.1...v1.4.0) (2026-01-03)
+
+
+### Features
+
+* add properties, tenants, organizations API with org filtering ([94c067b](https://github.com/mk-162/fixMate/commit/94c067ba3c642151102337169a96ca5d5be90012))
+
 ## [1.3.1](https://github.com/mk-162/fixMate/compare/v1.3.0...v1.3.1) (2026-01-03)
 
 
