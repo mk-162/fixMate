@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/mk-162/fixMate/compare/v1.5.0...v1.5.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* add detailed logging and error handling to Twilio webhooks ([09ba931](https://github.com/mk-162/fixMate/commit/09ba93175d28c7b16949d6fccf853f261500e4f9))
+
 # [1.5.0](https://github.com/mk-162/fixMate/compare/v1.4.0...v1.5.0) (2026-01-03)
 
 
