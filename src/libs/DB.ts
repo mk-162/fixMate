@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { PGlite } from '@electric-sql/pglite';
-import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
+import { drizzle as drizzlePg, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { migrate as migratePg } from 'drizzle-orm/node-postgres/migrator';
 import { drizzle as drizzlePglite, type PgliteDatabase } from 'drizzle-orm/pglite';
 import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator';
@@ -12,36 +12,60 @@ import * as schema from '@/models/Schema';
 
 import { Env } from './Env';
 
-let client;
-let drizzle;
+type DrizzleDB = NodePgDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
-// Need a database for production? Check out https://www.prisma.io/?via=saasboilerplatesrc
-// Tested and compatible with Next.js Boilerplate
-if (process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD && Env.DATABASE_URL) {
-  client = new Client({
-    connectionString: Env.DATABASE_URL,
-  });
-  await client.connect();
+// Global singleton for database connection
+const globalForDb = globalThis as unknown as {
+  dbPromise: Promise<DrizzleDB> | undefined;
+  db: DrizzleDB | undefined;
+};
 
-  drizzle = drizzlePg(client, { schema });
-  await migratePg(drizzle, {
-    migrationsFolder: path.join(process.cwd(), 'migrations'),
-  });
-} else {
-  // Stores the db connection in the global scope to prevent multiple instances due to hot reloading with Next.js
-  const global = globalThis as unknown as { client: PGlite; drizzle: PgliteDatabase<typeof schema> };
+async function initializeDatabase(): Promise<DrizzleDB> {
+  if (process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD && Env.DATABASE_URL) {
+    const client = new Client({
+      connectionString: Env.DATABASE_URL,
+    });
+    await client.connect();
 
-  if (!global.client) {
-    global.client = new PGlite();
-    await global.client.waitReady;
+    const drizzle = drizzlePg(client, { schema });
+    await migratePg(drizzle, {
+      migrationsFolder: path.join(process.cwd(), 'migrations'),
+    });
+    return drizzle;
+  } else {
+    // Use PGlite for local development without DATABASE_URL
+    const global = globalThis as unknown as { client: PGlite; drizzle: PgliteDatabase<typeof schema> };
 
-    global.drizzle = drizzlePglite(global.client, { schema });
+    if (!global.client) {
+      global.client = new PGlite();
+      await global.client.waitReady;
+
+      global.drizzle = drizzlePglite(global.client, { schema });
+    }
+
+    await migratePglite(global.drizzle, {
+      migrationsFolder: path.join(process.cwd(), 'migrations'),
+    });
+    return global.drizzle;
   }
-
-  drizzle = global.drizzle;
-  await migratePglite(global.drizzle, {
-    migrationsFolder: path.join(process.cwd(), 'migrations'),
-  });
 }
 
-export const db = drizzle;
+// Lazy initialization - call this in server actions/API routes
+export async function getDb(): Promise<DrizzleDB> {
+  if (globalForDb.db) {
+    return globalForDb.db;
+  }
+
+  if (!globalForDb.dbPromise) {
+    globalForDb.dbPromise = initializeDatabase().then((instance) => {
+      globalForDb.db = instance;
+      return instance;
+    });
+  }
+
+  return globalForDb.dbPromise;
+}
+
+// Deprecated: Use getDb() instead
+// This is only kept for backwards compatibility and will throw an error
+export const db = null as unknown as DrizzleDB;

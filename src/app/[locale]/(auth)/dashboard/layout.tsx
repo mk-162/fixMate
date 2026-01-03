@@ -20,8 +20,9 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
 
   return (
     <>
-      <div className="shadow-md">
-        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-3 py-4">
+      {/* Header with glass effect */}
+      <div className="sticky top-0 z-50 border-b border-border/50 bg-card/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 lg:px-6">
           <DashboardHeader
             menu={[
               {
@@ -53,8 +54,9 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="min-h-[calc(100vh-72px)] bg-muted">
-        <div className="mx-auto max-w-screen-xl px-3 pb-16 pt-6">
+      {/* Main content with gradient mesh background */}
+      <div className="gradient-mesh min-h-[calc(100vh-65px)] bg-background">
+        <div className="mx-auto max-w-screen-xl px-4 pb-16 pt-8 lg:px-6">
           {props.children}
         </div>
       </div>

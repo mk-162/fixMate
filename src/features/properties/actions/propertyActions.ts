@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
-import { db } from '@/libs/DB';
+import { getDb } from '@/libs/DB';
 import { propertiesSchema } from '@/models/Schema';
 
 import {
@@ -28,6 +28,7 @@ export async function createProperty(data: PropertyFormValues) {
   const ownerId = await getOwnerId();
   const validated = propertyFormSchema.parse(data);
 
+  const db = await getDb();
   const [property] = await db
     .insert(propertiesSchema)
     .values({
@@ -53,6 +54,7 @@ export async function getProperties(options?: {
   const { status, search, page = 1, limit = 10 } = options ?? {};
   const offset = (page - 1) * limit;
 
+  const db = await getDb();
   const conditions = [eq(propertiesSchema.ownerId, ownerId)];
 
   if (status) {
@@ -96,6 +98,7 @@ export async function getProperties(options?: {
 // READ (Single)
 export async function getProperty(id: number) {
   const ownerId = await getOwnerId();
+  const db = await getDb();
 
   const [property] = await db
     .select()
@@ -119,6 +122,7 @@ export async function updateProperty(
 ) {
   const ownerId = await getOwnerId();
   const validated = updatePropertySchema.parse(data);
+  const db = await getDb();
 
   const [property] = await db
     .update(propertiesSchema)
@@ -145,6 +149,7 @@ export async function updateProperty(
 // DELETE
 export async function deleteProperty(id: number) {
   const ownerId = await getOwnerId();
+  const db = await getDb();
 
   const [deleted] = await db
     .delete(propertiesSchema)

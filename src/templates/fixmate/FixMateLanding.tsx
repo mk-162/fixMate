@@ -55,6 +55,18 @@ const Navigation = () => {
             Safety
           </a>
           <a
+            href="/sign-in"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Sign In
+          </a>
+          <a
+            href="/sign-up"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-transparent px-5 py-2 text-sm font-semibold text-primary transition-all hover:bg-primary/10"
+          >
+            Sign Up
+          </a>
+          <a
             href="#demo"
             className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25"
           >
@@ -84,6 +96,8 @@ const Navigation = () => {
             <a href="#problem" className="text-sm font-medium text-muted-foreground">The Problem</a>
             <a href="#how-it-works" className="text-sm font-medium text-muted-foreground">How It Works</a>
             <a href="#safety" className="text-sm font-medium text-muted-foreground">Safety</a>
+            <a href="/sign-in" className="text-sm font-medium text-muted-foreground">Sign In</a>
+            <a href="/sign-up" className="text-sm font-medium text-primary">Sign Up</a>
             <a
               href="#demo"
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white"

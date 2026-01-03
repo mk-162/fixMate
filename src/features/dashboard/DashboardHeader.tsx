@@ -60,11 +60,16 @@ export const DashboardHeader = (props: {
           }}
         />
 
-        <nav className="ml-3 max-lg:hidden">
-          <ul className="flex flex-row items-center gap-x-3 text-lg font-medium [&_a:hover]:opacity-100 [&_a]:opacity-75">
+        <nav className="ml-4 max-lg:hidden">
+          <ul className="flex flex-row items-center gap-x-1 text-sm font-medium">
             {props.menu.map(item => (
               <li key={item.href}>
-                <ActiveLink href={item.href}>{item.label}</ActiveLink>
+                <ActiveLink
+                  href={item.href}
+                  className="rounded-lg px-3 py-2 text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary [&.active]:bg-primary/10 [&.active]:text-primary"
+                >
+                  {item.label}
+                </ActiveLink>
               </li>
             ))}
           </ul>

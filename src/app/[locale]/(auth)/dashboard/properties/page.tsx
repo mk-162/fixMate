@@ -22,18 +22,20 @@ export default async function PropertiesPage() {
 
   return (
     <>
-      <TitleBar title={t('title')} description={t('description')} />
+      <TitleBar
+        title={t('title')}
+        description={t('description')}
+        action={(
+          <Button asChild>
+            <Link href="/dashboard/properties/new" className="gap-2">
+              <Plus className="size-4" />
+              {t('addProperty')}
+            </Link>
+          </Button>
+        )}
+      />
 
-      <div className="mb-6 flex justify-end">
-        <Button asChild>
-          <Link href="/dashboard/properties/new">
-            <Plus className="mr-2 size-4" />
-            {t('addProperty')}
-          </Link>
-        </Button>
-      </div>
-
-      <div className="rounded-md bg-card p-5">
+      <div className="animate-fade-in rounded-xl border border-border bg-card p-6">
         {properties.length === 0
           ? (
               <PropertyEmptyState />
