@@ -47,17 +47,64 @@ type CreateIssueRequest = {
   category?: string;
 };
 
+// Property types
+type Property = {
+  id: number;
+  org_id: number;
+  name: string;
+  address: string | null;
+  tenant_count: number;
+  active_issue_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type CreatePropertyRequest = {
+  name: string;
+  address?: string;
+};
+
+// Tenant types
+type Tenant = {
+  id: number;
+  org_id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  property_id: number | null;
+  property_name: string | null;
+  property_address: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type CreateTenantRequest = {
+  name: string;
+  property_id?: number;
+  email?: string;
+  phone?: string;
+};
+
+// API request helper with optional org header
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
+  orgId?: string,
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (orgId) {
+    headers['X-Clerk-Org-Id'] = orgId;
+  }
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -129,6 +176,70 @@ export const FixmateAPI = {
       method: 'POST',
     });
   },
+
+  // ==========================================
+  // Properties API
+  // ==========================================
+  async listProperties(orgId: string): Promise<Property[]> {
+    return apiRequest('/api/properties', {}, orgId);
+  },
+
+  async createProperty(data: CreatePropertyRequest, orgId: string): Promise<Property> {
+    return apiRequest('/api/properties', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, orgId);
+  },
+
+  async updateProperty(propertyId: number, data: CreatePropertyRequest, orgId: string): Promise<Property> {
+    return apiRequest(`/api/properties/${propertyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, orgId);
+  },
+
+  async deleteProperty(propertyId: number, orgId: string): Promise<void> {
+    return apiRequest(`/api/properties/${propertyId}`, {
+      method: 'DELETE',
+    }, orgId);
+  },
+
+  // ==========================================
+  // Tenants API
+  // ==========================================
+  async listTenants(orgId: string, includeInactive = false): Promise<Tenant[]> {
+    const query = includeInactive ? '?include_inactive=true' : '';
+    return apiRequest(`/api/tenants${query}`, {}, orgId);
+  },
+
+  async createTenant(data: CreateTenantRequest, orgId: string): Promise<Tenant> {
+    return apiRequest('/api/tenants', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, orgId);
+  },
+
+  async updateTenant(tenantId: number, data: Partial<CreateTenantRequest>, orgId: string): Promise<Tenant> {
+    return apiRequest(`/api/tenants/${tenantId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, orgId);
+  },
+
+  async deleteTenant(tenantId: number, orgId: string): Promise<void> {
+    return apiRequest(`/api/tenants/${tenantId}`, {
+      method: 'DELETE',
+    }, orgId);
+  },
 };
 
-export type { AgentActivity, CreateIssueRequest, Issue, IssueMessage };
+export type {
+  AgentActivity,
+  CreateIssueRequest,
+  CreatePropertyRequest,
+  CreateTenantRequest,
+  Issue,
+  IssueMessage,
+  Property,
+  Tenant,
+};

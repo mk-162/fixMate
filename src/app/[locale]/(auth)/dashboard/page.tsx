@@ -126,7 +126,7 @@ export default function DashboardIndexPage() {
       {/* Quick Actions */}
       <div className="mb-8">
         <h2 className="mb-4 text-lg font-semibold text-foreground">Quick Actions</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <QuickAction
             title="View Issues"
             description="See all maintenance requests"
@@ -144,6 +144,12 @@ export default function DashboardIndexPage() {
             description="Manage your properties"
             icon={<Building2 className="size-5" />}
             href="/dashboard/properties"
+          />
+          <QuickAction
+            title="Tenants"
+            description="Manage tenant contacts"
+            icon={<MessageSquare className="size-5" />}
+            href="/dashboard/tenants"
           />
         </div>
       </div>
