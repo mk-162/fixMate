@@ -49,3 +49,12 @@ local
 
 # vercel
 .vercel
+
+# Python backend
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+backend/.env
