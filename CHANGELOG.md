@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/mk-162/fixMate/compare/v1.1.2...v1.2.0) (2026-01-03)
+
+
+### Bug Fixes
+
+* handle migration errors gracefully for existing schemas ([486edd8](https://github.com/mk-162/fixMate/commit/486edd8a25719b46a7b2188124276bb6e226aed1))
+
+
+### Features
+
+* add FixMate MVP dashboard with stats and quick actions ([378091e](https://github.com/mk-162/fixMate/commit/378091e9c979c040547574764520eaaf482efb6a))
+
 ## [1.1.2](https://github.com/mk-162/fixMate/compare/v1.1.1...v1.1.2) (2026-01-03)
 
 
