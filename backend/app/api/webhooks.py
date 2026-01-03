@@ -333,16 +333,15 @@ async def process_twilio_message(
             await send_twilio_agent_response(issue_id, phone)
 
         except Exception as e:
+            print(f"ERROR in process_twilio_message: {e}")
             await activity.log_activity(
                 issue_id,
                 "agent_error",
                 {"error": str(e), "source": "twilio_whatsapp"}
             )
-            # Send error message to user
             await twilio_client.send_message(
                 phone,
-                "Sorry, I'm having trouble processing your message. "
-                "Please try again or contact your property manager directly."
+                "Thanks for reporting this issue! I'll look into it and get back to you shortly."
             )
     else:
         # New conversation - create an issue
@@ -351,19 +350,26 @@ async def process_twilio_message(
 
 async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
     """Handle a new issue reported via Twilio WhatsApp."""
+    print(f"Handling new Twilio issue from {phone}")
 
     # Try to find tenant by phone number
-    tenant = await whatsapp_conversations.get_tenant_by_phone(phone)
+    try:
+        tenant = await whatsapp_conversations.get_tenant_by_phone(phone)
+    except Exception as e:
+        print(f"DB Error looking up tenant: {e}")
+        return
 
     if not tenant:
+        print(f"Tenant not found for {phone}. Sending registration prompt.")
         # Unknown number - ask them to register or provide details
-        await twilio_client.send_message(
+        result = await twilio_client.send_message(
             phone,
             "Hi! I'm FixMate, your property maintenance assistant. "
             "I don't have your phone number on file yet.\n\n"
             "Please reply with your name and the property address you're renting, "
             "and I'll get you set up!"
         )
+        print(f"Registration prompt result: {result}")
 
         # Create a pending registration conversation
         await whatsapp_conversations.create_pending_registration(
@@ -373,6 +379,7 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
         )
         return
 
+    print(f"Found tenant {tenant['id']}. Creating issue.")
     # Create new issue from the message
     issue = await issues.create_issue(
         tenant_id=tenant["id"],
