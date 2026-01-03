@@ -29,14 +29,20 @@ async function initializeDatabase(): Promise<DrizzleDB> {
 
     const drizzle = drizzlePg(client, { schema });
 
-    // Run migrations - catch errors for already-applied migrations
-    try {
-      await migratePg(drizzle, {
-        migrationsFolder: path.join(process.cwd(), 'migrations'),
-      });
-    } catch (error) {
-      // Log but don't fail if migrations have issues (likely already applied)
-      console.warn('Migration warning:', error instanceof Error ? error.message : error);
+    // Skip auto-migrations - run manually with: npm run db:generate && npm run db:migrate
+    // This prevents "already exists" errors when schema is already applied
+    if (process.env.RUN_MIGRATIONS === 'true') {
+      try {
+        await migratePg(drizzle, {
+          migrationsFolder: path.join(process.cwd(), 'migrations'),
+        });
+        // Migrations applied successfully
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('already exists')) {
+          console.error('Migration error:', message);
+        }
+      }
     }
 
     return drizzle;
@@ -65,10 +71,17 @@ export async function getDb(): Promise<DrizzleDB> {
   }
 
   if (!globalForDb.dbPromise) {
-    globalForDb.dbPromise = initializeDatabase().then((instance) => {
-      globalForDb.db = instance;
-      return instance;
-    });
+    globalForDb.dbPromise = initializeDatabase()
+      .then((instance) => {
+        globalForDb.db = instance;
+        return instance;
+      })
+      .catch((error) => {
+        // Reset promise so next call can retry
+        globalForDb.dbPromise = undefined;
+        console.error('Database initialization failed:', error);
+        throw error;
+      });
   }
 
   return globalForDb.dbPromise;
