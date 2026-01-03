@@ -300,8 +300,6 @@ async def process_twilio_message(
     Similar to process_whatsapp_message but uses phone as contact_id.
     """
     phone = parse_twilio_phone(from_number)
-
-    # Use phone number as contact_id for Twilio
     contact_id = phone
 
     # Check if we have an active conversation for this phone
@@ -310,6 +308,9 @@ async def process_twilio_message(
     if conversation:
         # Continue existing conversation
         issue_id = conversation["issue_id"]
+
+        # QUICK WIN: Send instant acknowledgment
+        await twilio_client.send_message(phone, "Got it, let me check on that...")
 
         # Record the message
         await messages.add_message(issue_id, "tenant", body)
@@ -328,8 +329,6 @@ async def process_twilio_message(
         # Trigger agent response
         try:
             await triage_agent.handle_tenant_response(issue_id, body)
-
-            # Send agent's response back via WhatsApp
             await send_twilio_agent_response(issue_id, phone)
 
         except Exception as e:
@@ -341,15 +340,137 @@ async def process_twilio_message(
             )
             await twilio_client.send_message(
                 phone,
-                "Thanks for reporting this issue! I'll look into it and get back to you shortly."
+                "Sorry, I'm having trouble right now. Your property manager has been notified and will get back to you soon."
             )
     else:
-        # New conversation - create an issue
-        await handle_new_twilio_issue(phone, body, message_sid)
+        # Check if this is a pending registration (user responding with their details)
+        pending = await whatsapp_conversations.get_pending_registration(contact_id)
+        if pending:
+            await handle_registration_response(phone, body, pending)
+        else:
+            # New conversation - create an issue or start registration
+            await handle_new_twilio_issue(phone, body, message_sid)
+
+
+async def handle_registration_response(phone: str, body: str, pending: dict):
+    """
+    Handle a user responding to the registration prompt.
+
+    Try to match them to a property and create their tenant record.
+    """
+    from app.db.database import fetch_all, fetch_one
+
+    # Get all properties to try to match
+    properties = await fetch_all("""
+        SELECT id, name, address FROM properties ORDER BY name
+    """)
+
+    if not properties:
+        await twilio_client.send_message(
+            phone,
+            "Sorry, no properties are set up yet. Please contact your property manager directly."
+        )
+        return
+
+    # Try to match the property from their message
+    body_lower = body.lower()
+    matched_property = None
+
+    for prop in properties:
+        prop_name = (prop["name"] or "").lower()
+        prop_address = (prop["address"] or "").lower()
+        if prop_name in body_lower or prop_address in body_lower:
+            matched_property = prop
+            break
+
+    if matched_property:
+        # Great! We found a match - create the tenant
+        await complete_registration(phone, body, matched_property, pending)
+    else:
+        # Couldn't match - show them the options
+        property_list = "\n".join([
+            f"- {p['name']}" + (f" ({p['address']})" if p['address'] else "")
+            for p in properties[:5]  # Limit to 5
+        ])
+
+        await twilio_client.send_message(
+            phone,
+            f"I couldn't find that property. Here are the properties I manage:\n\n"
+            f"{property_list}\n\n"
+            f"Please reply with your name and one of these property names."
+        )
+
+
+async def complete_registration(phone: str, body: str, property: dict, pending: dict):
+    """Complete the registration and create the tenant record."""
+    from app.db.database import execute_returning
+
+    # Extract name from the message (simple: take text before property name)
+    name = body.strip()
+    prop_name_lower = property["name"].lower()
+    if prop_name_lower in body.lower():
+        name_part = body.lower().split(prop_name_lower)[0].strip()
+        if name_part:
+            # Clean up common prefixes
+            for prefix in ["my name is ", "i'm ", "i am ", "this is ", "hi i'm ", "hi, i'm "]:
+                if name_part.startswith(prefix):
+                    name_part = name_part[len(prefix):]
+            name = name_part.strip().title() or "Tenant"
+
+    # Create the tenant
+    tenant = await execute_returning("""
+        INSERT INTO tenants (name, phone, property_id, is_active, created_at, updated_at)
+        VALUES ($1, $2, $3, TRUE, NOW(), NOW())
+        RETURNING *
+    """, name, phone, property["id"])
+
+    # Complete the registration
+    await whatsapp_conversations.complete_registration(phone, tenant["id"])
+
+    # Welcome message
+    await twilio_client.send_message(
+        phone,
+        f"Perfect! I've linked your number to {property['name']}.\n\n"
+        f"You can now message me anytime about maintenance issues. "
+        f"What can I help you with today?\n\n"
+        f"(Your original message: \"{pending['initial_message'][:100]}...\")"
+        if len(pending['initial_message']) > 100
+        else f"Perfect! I've linked your number to {property['name']}.\n\n"
+        f"You can now message me anytime about maintenance issues. "
+        f"What can I help you with today?\n\n"
+        f"(Your original message: \"{pending['initial_message']}\")"
+    )
+
+    # Now create an issue from their original message
+    from app.db import issues as issues_db
+
+    issue = await issues_db.create_issue(
+        tenant_id=tenant["id"],
+        property_id=property["id"],
+        title=f"WhatsApp: {pending['initial_message'][:50]}",
+        description=pending['initial_message'],
+        category=None,
+    )
+
+    # Create conversation record
+    await whatsapp_conversations.create_conversation(
+        contact_id=phone,
+        phone=phone,
+        tenant_id=tenant["id"],
+        issue_id=issue["id"],
+    )
+
+    # Trigger the agent to respond to their original issue
+    try:
+        await triage_agent.handle_new_issue(issue["id"])
+        await send_twilio_agent_response(issue["id"], phone)
+    except Exception as e:
+        print(f"Error triggering agent after registration: {e}")
 
 
 async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
     """Handle a new issue reported via Twilio WhatsApp."""
+    from app.db.database import fetch_all
     print(f"Handling new Twilio issue from {phone}")
 
     # Try to find tenant by phone number
@@ -357,29 +478,67 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
         tenant = await whatsapp_conversations.get_tenant_by_phone(phone)
     except Exception as e:
         print(f"DB Error looking up tenant: {e}")
+        await twilio_client.send_message(
+            phone,
+            "Sorry, I'm having technical difficulties. Please try again in a few minutes."
+        )
         return
 
     if not tenant:
         print(f"Tenant not found for {phone}. Sending registration prompt.")
-        # Unknown number - ask them to register or provide details
-        result = await twilio_client.send_message(
-            phone,
-            "Hi! I'm FixMate, your property maintenance assistant. "
-            "I don't have your phone number on file yet.\n\n"
-            "Please reply with your name and the property address you're renting, "
-            "and I'll get you set up!"
-        )
+
+        # Get available properties to show the user
+        try:
+            properties = await fetch_all("""
+                SELECT name, address FROM properties ORDER BY name LIMIT 5
+            """)
+            if properties:
+                property_list = "\n".join([
+                    f"- {p['name']}" + (f" ({p['address']})" if p['address'] else "")
+                    for p in properties
+                ])
+                message = (
+                    f"Hi! I'm FixMate, your property maintenance assistant.\n\n"
+                    f"I don't have your phone number on file yet. "
+                    f"Here are the properties I manage:\n\n"
+                    f"{property_list}\n\n"
+                    f"Please reply with your name and which property you live at, "
+                    f"and I'll get you set up!"
+                )
+            else:
+                message = (
+                    "Hi! I'm FixMate, your property maintenance assistant.\n\n"
+                    "I don't have your phone number on file yet, and no properties "
+                    "are set up. Please contact your property manager directly."
+                )
+        except Exception:
+            message = (
+                "Hi! I'm FixMate, your property maintenance assistant.\n\n"
+                "I don't have your phone number on file yet. "
+                "Please reply with your name and property address, "
+                "and I'll get you set up!"
+            )
+
+        result = await twilio_client.send_message(phone, message)
         print(f"Registration prompt result: {result}")
 
         # Create a pending registration conversation
         await whatsapp_conversations.create_pending_registration(
-            contact_id=phone,  # Use phone as contact_id for Twilio
+            contact_id=phone,
             phone=phone,
             initial_message=body,
         )
         return
 
     print(f"Found tenant {tenant['id']}. Creating issue.")
+
+    # QUICK WIN: Instant acknowledgment for known users
+    property_name = tenant.get("property_name", "your property")
+    await twilio_client.send_message(
+        phone,
+        f"Hi {tenant['name'].split()[0]}! Got your message. Let me look into this for {property_name}..."
+    )
+
     # Create new issue from the message
     issue = await issues.create_issue(
         tenant_id=tenant["id"],
@@ -422,6 +581,7 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
         await send_twilio_agent_response(issue["id"], phone)
 
     except Exception as e:
+        print(f"Agent error for issue {issue['id']}: {e}")
         await activity.log_activity(
             issue["id"],
             "agent_error",
@@ -429,7 +589,8 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
         )
         await twilio_client.send_message(
             phone,
-            "Thanks for reporting this issue! I'll look into it and get back to you shortly."
+            "I've logged your issue and your property manager will be in touch soon. "
+            "Is there anything else you'd like to add?"
         )
 
 
