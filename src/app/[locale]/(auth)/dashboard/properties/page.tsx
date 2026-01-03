@@ -1,7 +1,6 @@
 'use client';
 
-import { useOrganization } from '@clerk/nextjs';
-import { Building2, Home, MapPin, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Building2, Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -16,10 +15,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TitleBar } from '@/features/dashboard/TitleBar';
-import { FixmateAPI, type Property } from '@/libs/FixmateAPI';
+import {
+  createProperty,
+  deleteProperty,
+  getProperties,
+  updateProperty,
+} from '@/features/properties/actions/propertyActions';
+import type { Property } from '@/models/Schema';
 
 export default function PropertiesPage() {
-  const { organization } = useOrganization();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -31,15 +35,10 @@ export default function PropertiesPage() {
   const [formAddress, setFormAddress] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
-  const orgId = organization?.id;
-
   const fetchProperties = async () => {
-    if (!orgId) {
-      return;
-    }
     try {
-      const data = await FixmateAPI.listProperties(orgId);
-      setProperties(data);
+      const result = await getProperties();
+      setProperties(result.data);
     } catch (error) {
       console.error('Failed to load properties:', error);
     } finally {
@@ -49,18 +48,21 @@ export default function PropertiesPage() {
 
   useEffect(() => {
     fetchProperties();
-  }, [orgId]);
+  }, []);
 
   const handleAdd = async () => {
-    if (!orgId || !formName.trim()) {
+    if (!formName.trim() || !formAddress.trim()) {
       return;
     }
     setFormLoading(true);
     try {
-      await FixmateAPI.createProperty({
+      await createProperty({
         name: formName.trim(),
-        address: formAddress.trim() || undefined,
-      }, orgId);
+        address: formAddress.trim(),
+        totalRooms: 1,
+        monthlyRent: 0,
+        status: 'available',
+      });
       setShowAddModal(false);
       setFormName('');
       setFormAddress('');
@@ -73,15 +75,15 @@ export default function PropertiesPage() {
   };
 
   const handleEdit = async () => {
-    if (!orgId || !editingProperty || !formName.trim()) {
+    if (!editingProperty || !formName.trim()) {
       return;
     }
     setFormLoading(true);
     try {
-      await FixmateAPI.updateProperty(editingProperty.id, {
+      await updateProperty(editingProperty.id, {
         name: formName.trim(),
         address: formAddress.trim() || undefined,
-      }, orgId);
+      });
       setEditingProperty(null);
       setFormName('');
       setFormAddress('');
@@ -94,12 +96,12 @@ export default function PropertiesPage() {
   };
 
   const handleDelete = async () => {
-    if (!orgId || !deleteConfirm) {
+    if (!deleteConfirm) {
       return;
     }
     setFormLoading(true);
     try {
-      await FixmateAPI.deleteProperty(deleteConfirm.id, orgId);
+      await deleteProperty(deleteConfirm.id);
       setDeleteConfirm(null);
       fetchProperties();
     } catch (error) {
@@ -192,21 +194,16 @@ export default function PropertiesPage() {
 
                     <div className="mt-4 flex gap-4 text-sm">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Users className="size-4" />
-                        {property.tenant_count}
+                        <Building2 className="size-4" />
+                        {property.totalRooms}
                         {' '}
-                        tenant
-                        {property.tenant_count !== 1 ? 's' : ''}
+                        room
+                        {property.totalRooms !== 1 ? 's' : ''}
                       </div>
-                      {property.active_issue_count > 0 && (
-                        <div className="flex items-center gap-1.5 text-amber-600">
-                          <span className="size-2 rounded-full bg-amber-500" />
-                          {property.active_issue_count}
-                          {' '}
-                          active issue
-                          {property.active_issue_count !== 1 ? 's' : ''}
-                        </div>
-                      )}
+                      <div className={`flex items-center gap-1.5 ${property.status === 'available' ? 'text-green-600' : 'text-blue-600'}`}>
+                        <span className={`size-2 rounded-full ${property.status === 'available' ? 'bg-green-500' : 'bg-blue-500'}`} />
+                        {property.status === 'available' ? 'Available' : 'Occupied'}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -233,7 +230,7 @@ export default function PropertiesPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">Address *</Label>
               <Input
                 id="address"
                 placeholder="Full address"
@@ -246,7 +243,7 @@ export default function PropertiesPage() {
             <Button variant="outline" onClick={() => setShowAddModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAdd} disabled={!formName.trim() || formLoading}>
+            <Button onClick={handleAdd} disabled={!formName.trim() || !formAddress.trim() || formLoading}>
               {formLoading ? 'Adding...' : 'Add Property'}
             </Button>
           </DialogFooter>
@@ -269,7 +266,7 @@ export default function PropertiesPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-address">Address</Label>
+              <Label htmlFor="edit-address">Address *</Label>
               <Input
                 id="edit-address"
                 value={formAddress}
@@ -281,7 +278,7 @@ export default function PropertiesPage() {
             <Button variant="outline" onClick={() => setEditingProperty(null)}>
               Cancel
             </Button>
-            <Button onClick={handleEdit} disabled={!formName.trim() || formLoading}>
+            <Button onClick={handleEdit} disabled={!formName.trim() || !formAddress.trim() || formLoading}>
               {formLoading ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>

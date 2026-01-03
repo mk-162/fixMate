@@ -103,9 +103,9 @@ async def run_migration():
         for i, stmt in enumerate(statements):
             try:
                 await conn.execute(stmt)
-                print(f"  ✓ Statement {i+1}/{len(statements)} OK")
+                print(f"  [OK] Statement {i+1}/{len(statements)}")
             except Exception as e:
-                print(f"  ✗ Statement {i+1} failed: {e}")
+                print(f"  [FAIL] Statement {i+1}: {e}")
         
         print("\nMigration completed!")
 

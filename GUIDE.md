@@ -13,137 +13,171 @@
 
 ## Architecture Overview
 
+FixMate uses a **hybrid architecture** with two backends:
+
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Frontend      │────▶│   FastAPI       │────▶│   PostgreSQL    │
-│   (Next.js)     │     │   Backend       │     │   (Neon)        │
-└─────────────────┘     └────────┬────────┘     └─────────────────┘
-                                 │
-                                 ▼
-                        ┌─────────────────┐
-                        │  Claude Agent   │
-                        │  SDK (Triage)   │
-                        └─────────────────┘
++-------------------------------------------------------------------------+
+|                              FRONTEND                                    |
+|                         Vercel (Next.js)                                 |
+|  +-------------------------------------------------------------------+  |
+|  |  Dashboard UI  |  Properties  |  Tenants  |  Issues View          |  |
+|  |  (React)       |  (Server     |  (API     |  (API calls)          |  |
+|  |                |   Actions)   |   calls)  |                        |  |
+|  +-------+--------+------+-------+-----+-----+----------+-------------+  |
+|          |               |             |                |                |
++----------+---------------+-------------+----------------+----------------+
+           |               |             |                |
+           v               |             v                v
++-------------------+      |    +-------------------------------------+
+|   Neon PostgreSQL |<-----+    |        Railway (Python FastAPI)     |
+|   (Database)      |<----------|  +-----------------------------+    |
+|                   |           |  |  AI Triage Agent (Claude)   |    |
+|  - properties     |           |  |  WhatsApp Webhooks          |    |
+|  - tenants        |           |  |  Issues API                 |    |
+|  - issues         |           |  |  Tenants API (for WhatsApp) |    |
+|  - messages       |           |  +-----------------------------+    |
+|  - organizations  |           |                 |                    |
++-------------------+           |                 v                    |
+                                |  +-----------------------------+    |
+                                |  |  Twilio / Respond.io        |    |
+                                |  |  (WhatsApp Integration)     |    |
+                                |  +-----------------------------+    |
+                                +-------------------------------------+
 ```
+
+### What Lives Where
+
+| Feature | Location | Technology | Why |
+|---------|----------|------------|-----|
+| **Dashboard UI** | Vercel | Next.js | Fast, serverless, easy deployment |
+| **Properties CRUD** | Vercel | Server Actions + Drizzle | Direct DB access, no CORS issues |
+| **Tenants CRUD** | Railway | FastAPI API | WhatsApp integration needs phone lookup |
+| **Issues/Messages** | Railway | FastAPI API | AI agent needs access |
+| **AI Triage Agent** | Railway | Claude Agent SDK | Long-running Python process |
+| **WhatsApp Webhooks** | Railway | FastAPI | Webhook endpoints for Twilio/Respond.io |
+| **Auth** | Vercel | Clerk | Session management |
 
 ### Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js, React, TypeScript, Tailwind CSS, Shadcn UI |
-| Backend | Python FastAPI, Uvicorn |
-| Database | PostgreSQL (Neon), asyncpg |
-| AI | Claude Agent SDK (Anthropic) |
-| Auth | Clerk (planned) |
+| Layer | Technology | Hosted On |
+|-------|------------|-----------|
+| Frontend | Next.js, React, TypeScript, Tailwind CSS, Shadcn UI | Vercel |
+| Backend (AI/WhatsApp) | Python FastAPI, Uvicorn, Claude Agent SDK | Railway |
+| Database | PostgreSQL, Drizzle ORM (Next.js), asyncpg (Python) | Neon |
+| Auth | Clerk | Vercel |
+| WhatsApp | Twilio Sandbox / Respond.io | External |
+
+---
+
+## Why Two Backends?
+
+### Railway (Python) is needed for:
+
+1. **AI Triage Agent** - Uses Claude Agent SDK which is Python-only
+2. **WhatsApp Webhooks** - Long-running webhook handlers that process messages
+3. **Tenants API** - WhatsApp integration looks up tenants by phone number
+
+### Vercel (Next.js) is better for:
+
+1. **Dashboard UI** - Server-side rendering, fast page loads
+2. **Properties CRUD** - Server Actions = no CORS, no API layer needed
+3. **Auth** - Clerk integrates natively with Next.js
 
 ---
 
 ## Core Components
 
-### 1. Backend (`/backend`)
+### 1. Backend (`/backend`) - Railway
 
 ```
 backend/
 ├── app/
-│   ├── main.py           # FastAPI app setup, CORS
-│   ├── config.py         # Environment configuration
+│   ├── main.py              # FastAPI app setup, CORS
+│   ├── config.py            # Environment configuration
 │   ├── agents/
-│   │   └── triage_agent.py   # AI agent logic
+│   │   └── triage_agent.py  # AI agent logic (Claude)
 │   ├── api/
-│   │   └── routes.py     # REST endpoints
+│   │   ├── routes.py        # Issues REST endpoints
+│   │   ├── webhooks.py      # WhatsApp webhook handlers
+│   │   ├── properties.py    # Properties API (legacy)
+│   │   ├── tenants.py       # Tenants API
+│   │   └── organizations.py # Org management
 │   ├── db/
-│   │   ├── database.py   # Connection pooling
-│   │   ├── issues.py     # Issue CRUD
-│   │   ├── messages.py   # Conversation storage
-│   │   └── activity.py   # Audit logging
+│   │   ├── database.py      # Connection pooling (asyncpg)
+│   │   ├── issues.py        # Issue CRUD
+│   │   ├── messages.py      # Conversation storage
+│   │   ├── tenants.py       # Tenant CRUD
+│   │   ├── properties.py    # Properties CRUD
+│   │   ├── organizations.py # Org CRUD
+│   │   ├── whatsapp.py      # WhatsApp conversation tracking
+│   │   └── activity.py      # Audit logging
+│   ├── integrations/
+│   │   ├── twilio_whatsapp.py   # Twilio WhatsApp client
+│   │   └── respondio.py         # Respond.io client
 │   └── tools/
-│       └── issue_tools.py    # Claude Agent tools (MCP)
+│       └── issue_tools.py   # Claude Agent tools (MCP)
+├── migrate.py               # Initial migration
+├── migrate_mvp.py           # MVP tables migration
+└── migrate_add_org_id.py    # Add org_id columns
 ```
 
-### 2. Frontend (`/temp`)
+### 2. Frontend (`/src`) - Vercel
 
-Next.js boilerplate with:
-- Shadcn UI components
-- Drizzle ORM for database
-- React Hook Form + Zod validation
-- i18n support
-- E2E testing (Playwright)
+```
+src/
+├── app/[locale]/(auth)/dashboard/
+│   ├── properties/          # Uses Server Actions (fixed!)
+│   ├── tenants/             # Uses Railway API (for WhatsApp)
+│   └── ...
+├── features/
+│   ├── properties/
+│   │   ├── actions/         # Server Actions (createProperty, etc.)
+│   │   ├── components/      # PropertyForm, PropertyTable
+│   │   └── schemas/         # Zod validation
+│   └── ...
+├── libs/
+│   ├── DB.ts                # Drizzle database client
+│   └── FixmateAPI.ts        # Railway API client
+└── models/
+    └── Schema.ts            # Drizzle schema definitions
+```
 
 ---
 
-## How It Works
+## Database Schema
 
-### Issue Lifecycle
+Both backends share the same Neon PostgreSQL database but use different ORMs:
 
-```
-1. TENANT SUBMITS ISSUE
-   └─▶ Issue created in database
-   └─▶ TriageAgent triggered
+- **Next.js**: Drizzle ORM
+- **Python**: Raw asyncpg queries
 
-2. AI TRIAGE
-   └─▶ Agent analyzes issue
-   └─▶ Asks clarifying questions
-   └─▶ Provides troubleshooting steps
-   └─▶ Decides: resolve OR escalate
+### Tables
 
-3. RESOLUTION PATHS
-   ├─▶ Self-Resolved: Agent guides fix, schedules follow-up
-   ├─▶ Escalated: Sent to property manager
-   └─▶ Assigned: Tradesperson scheduled
+| Table | Created By | Used By |
+|-------|------------|---------|
+| `properties` | Drizzle | Next.js (Server Actions) |
+| `tenants` | Drizzle + Python migrations | Railway (WhatsApp), Next.js (UI) |
+| `issues` | Python migrations | Railway (Agent) |
+| `issue_messages` | Python migrations | Railway (Agent) |
+| `agent_activity` | Python migrations | Railway (Agent) |
+| `organizations` | Python migrations | Railway (multi-tenancy) |
+| `whatsapp_conversations` | Python migrations | Railway (WhatsApp) |
 
-4. FOLLOW-UP
-   └─▶ Automated checks (Day 3, 7, 14, 30)
-   └─▶ Issue closed when confirmed resolved
-```
+### Schema Notes
 
-### Issue Statuses
+The `tenants` table has columns from both systems:
+- Drizzle adds: `clerk_user_id`, `room_number`, `move_in_date`
+- Python adds: `org_id`, `is_active`
 
-| Status | Description |
-|--------|-------------|
-| `new` | Just created |
-| `triaging` | Agent is analyzing |
-| `resolved_by_agent` | Tenant fixed with agent help |
-| `escalated` | Sent to property manager |
-| `assigned` | Tradesperson scheduled |
-| `in_progress` | Work underway |
-| `awaiting_confirmation` | Waiting for tenant confirmation |
-| `closed` | Fully resolved |
-
----
-
-## The Triage Agent
-
-The AI agent (`TriageAgent`) uses Claude to:
-
-1. **Understand the issue** - Asks clarifying questions about symptoms
-2. **Troubleshoot** - Provides step-by-step guidance for 100+ common issues
-3. **Make decisions** - Escalates when safety/complexity requires it
-
-### Agent Tools (MCP)
-
-| Tool | Purpose |
-|------|---------|
-| `send_message_to_tenant` | Ask questions or provide guidance |
-| `log_reasoning` | Document decision-making |
-| `resolve_with_troubleshooting` | Mark issue as self-resolved |
-| `escalate_to_property_manager` | Escalate with priority |
-| `schedule_followup` | Schedule verification checks |
-| `update_issue_status` | Change issue status |
-
-### Troubleshooting Knowledge
-
-The agent knows how to handle:
-- **Appliances**: Washing machines, dishwashers, dryers
-- **HVAC**: Heating, hot water, thermostats
-- **Plumbing**: Drains, leaks, toilets
-- **Electrical**: Outlets, breakers (with safety escalation)
+This works because both migrations use `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`.
 
 ---
 
 ## API Endpoints
 
-### Issue Management
+### Railway Backend (https://fixmate-production-XXXX.up.railway.app)
 
+#### Issues (AI Agent)
 ```
 POST   /api/issues                 # Create issue (triggers agent)
 GET    /api/issues                 # List issues
@@ -151,79 +185,117 @@ GET    /api/issues/{id}            # Get issue details
 POST   /api/issues/{id}/messages   # Tenant sends message
 GET    /api/issues/{id}/messages   # Get conversation
 GET    /api/issues/{id}/activity   # Get activity log
-```
-
-### Property Manager Actions
-
-```
 POST   /api/issues/{id}/assign     # Assign tradesperson
 POST   /api/issues/{id}/close      # Close issue
-GET    /api/activity               # Global activity feed
+```
+
+#### Tenants (for WhatsApp)
+```
+GET    /api/tenants                # List tenants (by org)
+POST   /api/tenants                # Create tenant
+PUT    /api/tenants/{id}           # Update tenant
+DELETE /api/tenants/{id}           # Soft delete tenant
+```
+
+#### WhatsApp Webhooks
+```
+POST   /webhooks/twilio            # Twilio WhatsApp messages
+POST   /webhooks/respondio         # Respond.io messages
+```
+
+### Next.js Server Actions (no HTTP endpoints)
+
+```typescript
+// Properties (src/features/properties/actions/propertyActions.ts)
+createProperty(data);
+getProperties(options);
+getProperty(id);
+updateProperty(id, data);
+deleteProperty(id);
 ```
 
 ---
 
-## Database Schema
+## Environment Variables
 
-```sql
-issues
-├── id, tenant_id, property_id
-├── title, description, category
-├── status, priority
-├── resolved_by_agent, assigned_to
-├── follow_up_date
-└── created_at, updated_at, closed_at
+### Vercel (.env.local)
+```bash
+DATABASE_URL=postgresql://...      # Neon connection string
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+NEXT_PUBLIC_FIXMATE_API_URL=https://fixmate-production-XXXX.up.railway.app
+```
 
-issue_messages
-├── id, issue_id
-├── role (tenant/agent/system)
-├── content, metadata
-└── created_at
-
-agent_activity
-├── id, issue_id
-├── action, details
-├── would_notify
-└── created_at
+### Railway
+```bash
+DATABASE_URL=postgresql://...      # Same Neon connection
+ANTHROPIC_API_KEY=sk-ant-...       # For Claude Agent
+TWILIO_ACCOUNT_SID=AC...           # Twilio WhatsApp
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 ```
 
 ---
 
-## Data Flow Example
+## Current Status & Known Issues
 
-**Tenant reports: "Washing machine not starting"**
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Properties (Dashboard) | ✅ Working | Uses Server Actions |
+| Tenants (Dashboard) | ⚠️ Uses Railway | Should migrate to Server Actions |
+| AI Triage Agent | ✅ Working | Railway + Claude |
+| WhatsApp Integration | ✅ Working | Twilio sandbox |
+| Issues View | ⚠️ Uses Railway | Intentional - needs agent access |
 
-1. `POST /api/issues` → Creates issue, triggers agent
-2. Agent analyzes → Asks "Do you see any lights on the display?"
-3. Tenant responds via `POST /api/issues/{id}/messages`
-4. Agent suggests: "Check the door is fully closed and power outlet works"
-5. If fixed → `resolve_with_troubleshooting()` + schedule 3-day follow-up
-6. If not → `escalate_to_property_manager()` with priority
+### Known Schema Conflicts
+
+The `tenants` and `properties` tables have columns from both Drizzle and Python migrations. This works but is messy. Future consolidation recommended.
 
 ---
 
-## Environment Setup
+## Development Workflow
 
-Required `.env` variables:
+### Run Locally
 
 ```bash
-DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
-ANTHROPIC_API_KEY=sk-ant-...
-NOTIFICATIONS_ENABLED=False
+# Frontend (Next.js)
+npm run dev
+
+# Backend (Python) - in backend/ directory
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+uvicorn app.main:app --reload --port 8000
+```
+
+### Deploy
+
+```bash
+# Frontend - auto-deploys on git push to Vercel
+git push origin main
+
+# Backend - auto-deploys on git push to Railway
+# (Railway watches the /backend directory)
+```
+
+### Run Migrations
+
+```bash
+# Drizzle (Next.js schema)
+npm run db:generate
+npm run db:push
+
+# Python (Railway schema)
+cd backend
+python migrate_add_org_id.py
 ```
 
 ---
 
-## Current Status
+## Future Improvements
 
-| Component | Status |
-|-----------|--------|
-| Backend API | Complete |
-| Claude Agent Integration | Complete |
-| Database Layer | Complete |
-| Frontend UI | Boilerplate exists |
-| Authentication | Planned (Clerk) |
-| Notifications | Logged, not sent |
+1. **Consolidate Tenants** - Create Server Actions for tenants, keep Railway API only for WhatsApp webhook lookups
+2. **Unify Schema** - Pick one migration system (recommend Drizzle)
+3. **Add Tenant Server Actions** - Mirror the properties pattern
+4. **Remove FixmateAPI.ts** - Once all dashboard features use Server Actions
 
 ---
 
@@ -232,7 +304,8 @@ NOTIFICATIONS_ENABLED=False
 | File | Purpose |
 |------|---------|
 | `backend/app/agents/triage_agent.py` | Core AI agent logic |
-| `backend/app/tools/issue_tools.py` | MCP tools for Claude |
-| `backend/app/api/routes.py` | All REST endpoints |
+| `backend/app/api/webhooks.py` | WhatsApp webhook handlers |
 | `backend/app/db/*.py` | Database operations |
-| `backend/app/main.py` | FastAPI app entry point |
+| `src/features/properties/actions/propertyActions.ts` | Property Server Actions |
+| `src/libs/FixmateAPI.ts` | Railway API client (for tenants/issues) |
+| `src/models/Schema.ts` | Drizzle schema definitions |
