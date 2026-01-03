@@ -3,7 +3,16 @@
  * Connects the Next.js frontend to the Python backend
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_FIXMATE_API_URL || 'http://localhost:8000';
+const getApiBase = () => {
+  let url = process.env.NEXT_PUBLIC_FIXMATE_API_URL || 'http://localhost:8000';
+  if (url && !url.startsWith('http')) {
+    url = `https://${url}`;
+  }
+  // Remove trailing headers if present
+  return url.replace(/\/$/, '');
+};
+
+const API_BASE = getApiBase();
 
 type Issue = {
   id: number;
