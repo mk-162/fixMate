@@ -2,12 +2,25 @@
 
 ## What It Does
 
-**FixMate** is an intelligent property maintenance management system that uses Claude AI to help tenants resolve maintenance issues. The platform:
+**FixMate** is an intelligent property maintenance management system powered by the **Claude Agent SDK**. The platform uses advanced AI to help tenants resolve maintenance issues, saving property managers time and money.
 
-- **Reduces unnecessary tradesperson callouts** by guiding tenants through troubleshooting steps
-- **Automates issue triage** using an AI agent that asks clarifying questions and makes smart decisions
-- **Manages multi-stage workflows** from initial report through resolution and follow-up verification
-- **Tracks all conversations and decisions** for property managers
+### Key Capabilities
+
+- **Smart Issue Triage** - AI agent asks clarifying questions and guides troubleshooting
+- **Emergency Detection** - Automatically detects gas leaks, flooding, fires and escalates immediately
+- **Cost Estimation** - Provides repair cost ranges when escalating to professionals
+- **Sentiment Tracking** - Monitors tenant satisfaction throughout conversations
+- **Resolution Analytics** - Tracks savings from issues resolved without callouts
+- **WhatsApp Integration** - Tenants can report issues via WhatsApp
+
+### Business Impact
+
+| Metric | Value |
+|--------|-------|
+| Average callout cost | £150 |
+| AI resolution target | 40%+ of issues |
+| Response time | < 30 seconds |
+| 24/7 availability | Yes |
 
 ---
 
@@ -303,9 +316,101 @@ python migrate_add_org_id.py
 
 | File | Purpose |
 |------|---------|
-| `backend/app/agents/triage_agent.py` | Core AI agent logic |
+| `backend/app/agents/triage_agent.py` | Core AI agent logic (Claude Agent SDK) |
+| `backend/app/api/routes.py` | Issues API + Analytics endpoints |
 | `backend/app/api/webhooks.py` | WhatsApp webhook handlers |
 | `backend/app/db/*.py` | Database operations |
 | `src/features/properties/actions/propertyActions.ts` | Property Server Actions |
 | `src/libs/FixmateAPI.ts` | Railway API client (for tenants/issues) |
 | `src/models/Schema.ts` | Drizzle schema definitions |
+
+---
+
+## Claude Agent SDK Integration
+
+FixMate uses the official **Claude Agent SDK** for its AI capabilities. This provides:
+
+### Agent Architecture
+
+```python
+# The TriageAgent class uses ClaudeSDKClient for conversations
+class TriageAgent:
+    def __init__(self):
+        self.mcp_server = create_fixmate_mcp_server()
+
+    async def handle_new_issue(self, issue_id: int) -> str:
+        # Agent automatically:
+        # 1. Detects emergencies
+        # 2. Logs reasoning
+        # 3. Sends helpful messages
+        # 4. Tracks sentiment
+        # 5. Resolves or escalates
+```
+
+### MCP Tools Available
+
+| Tool | Purpose |
+|------|---------|
+| `send_message_to_tenant` | Communicate with tenant (with message type tracking) |
+| `log_reasoning` | Document AI decision-making process |
+| `detect_emergency` | Scan for emergency keywords (gas, fire, flood) |
+| `estimate_repair_cost` | Provide cost ranges by category/severity |
+| `assess_sentiment` | Track tenant satisfaction (-1 to +1 score) |
+| `escalate_to_property_manager` | Escalate with priority and cost estimate |
+| `resolve_with_troubleshooting` | Mark resolved with savings tracking |
+| `schedule_followup` | Schedule follow-up checks |
+| `get_issue_context` | Retrieve full issue history |
+
+### Analytics Endpoints (Investor Demo)
+
+```
+GET /api/analytics/overview      # Full dashboard data
+GET /api/analytics/resolution    # Resolution stats & savings
+GET /api/analytics/categories    # Issue breakdown by type
+GET /api/analytics/response-times # Agent response metrics
+GET /api/demo/simulate-issue     # Create demo scenarios
+```
+
+### Demo Scenarios
+
+Use `/api/demo/simulate-issue?scenario=X` to create test issues:
+
+| Scenario | Description | Expected Outcome |
+|----------|-------------|------------------|
+| `washing_machine` | Appliance won't start | Troubleshooting → Resolution |
+| `emergency` | Gas smell detected | Immediate escalation (urgent) |
+| `heating` | Boiler error code | Troubleshooting → Varies |
+| `plumbing` | Slow drain | Simple fix guidance |
+
+---
+
+## Investor Demo Guide
+
+### Quick Start
+
+1. **Create a demo issue:**
+   ```bash
+   curl -X GET "https://your-api.railway.app/api/demo/simulate-issue?scenario=washing_machine"
+   ```
+
+2. **View the conversation:**
+   ```bash
+   curl "https://your-api.railway.app/api/issues/{id}/messages"
+   ```
+
+3. **See agent activity:**
+   ```bash
+   curl "https://your-api.railway.app/api/issues/{id}/activity"
+   ```
+
+4. **Get analytics:**
+   ```bash
+   curl "https://your-api.railway.app/api/analytics/overview"
+   ```
+
+### Key Metrics to Highlight
+
+- **Resolution Rate**: % of issues resolved without callouts
+- **Total Savings**: £150 × resolved issues
+- **Response Time**: Typically < 30 seconds
+- **Emergency Detection**: Instant escalation for safety issues

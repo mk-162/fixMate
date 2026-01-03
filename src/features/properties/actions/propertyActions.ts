@@ -5,7 +5,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 import { getDb } from '@/libs/DB';
-import { propertiesSchema } from '@/models/Schema';
+import { issuesSchema, propertiesSchema, tenantsSchema } from '@/models/Schema';
 
 import {
   propertyFormSchema,
@@ -164,4 +164,63 @@ export async function deleteProperty(id: number) {
 
   revalidatePath('/[locale]/dashboard/properties', 'page');
   return { success: true };
+}
+
+// READ (Property with related data)
+export async function getPropertyWithDetails(id: number) {
+  const ownerId = await getOwnerId();
+  const db = await getDb();
+
+  const [property] = await db
+    .select()
+    .from(propertiesSchema)
+    .where(
+      and(eq(propertiesSchema.id, id), eq(propertiesSchema.ownerId, ownerId)),
+    )
+    .limit(1);
+
+  if (!property) {
+    throw new Error('Property not found');
+  }
+
+  // Get tenants for this property
+  const tenants = await db
+    .select({
+      id: tenantsSchema.id,
+      name: tenantsSchema.name,
+      email: tenantsSchema.email,
+      phone: tenantsSchema.phone,
+      roomNumber: tenantsSchema.roomNumber,
+      moveInDate: tenantsSchema.moveInDate,
+    })
+    .from(tenantsSchema)
+    .where(eq(tenantsSchema.propertyId, id));
+
+  // Get issues for this property
+  const issues = await db
+    .select({
+      id: issuesSchema.id,
+      title: issuesSchema.title,
+      description: issuesSchema.description,
+      category: issuesSchema.category,
+      status: issuesSchema.status,
+      priority: issuesSchema.priority,
+      assignedTo: issuesSchema.assignedTo,
+      createdAt: issuesSchema.createdAt,
+    })
+    .from(issuesSchema)
+    .where(eq(issuesSchema.propertyId, id))
+    .orderBy(desc(issuesSchema.createdAt))
+    .limit(10);
+
+  return {
+    property,
+    tenants,
+    issues,
+    stats: {
+      tenantCount: tenants.length,
+      activeIssueCount: issues.filter(i => !['closed', 'resolved_by_agent'].includes(i.status)).length,
+      resolvedIssueCount: issues.filter(i => ['closed', 'resolved_by_agent'].includes(i.status)).length,
+    },
+  };
 }

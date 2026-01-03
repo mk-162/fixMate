@@ -105,3 +105,15 @@ async def close_issue(issue_id: int) -> Optional[Dict[str, Any]]:
     """
     row = await execute_returning(query, issue_id)
     return dict(row) if row else None
+
+
+async def update_pm_notes(issue_id: int, notes: str) -> Optional[Dict[str, Any]]:
+    """Update property manager notes on an issue."""
+    query = """
+        UPDATE issues
+        SET pm_notes = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    """
+    row = await execute_returning(query, issue_id, notes)
+    return dict(row) if row else None

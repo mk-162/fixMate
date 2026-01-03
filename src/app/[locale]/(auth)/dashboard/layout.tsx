@@ -30,6 +30,10 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
                 label: t('home'),
               },
               {
+                href: '/dashboard/demo',
+                label: 'AI Demo',
+              },
+              {
                 href: '/dashboard/issues',
                 label: 'Issues',
               },

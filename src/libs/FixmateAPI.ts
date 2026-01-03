@@ -26,6 +26,7 @@ type Issue = {
   resolved_by_agent: string | null;
   assigned_to: string | null;
   follow_up_date: string | null;
+  pm_notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -186,6 +187,20 @@ export const FixmateAPI = {
     });
   },
 
+  async updateIssueStatus(issueId: number, status: string): Promise<{ status: string }> {
+    return apiRequest(`/api/issues/${issueId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async updateIssueNotes(issueId: number, notes: string): Promise<{ status: string; pm_notes: string }> {
+    return apiRequest(`/api/issues/${issueId}/notes`, {
+      method: 'PUT',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
   // ==========================================
   // Properties API
   // ==========================================
@@ -240,13 +255,83 @@ export const FixmateAPI = {
       method: 'DELETE',
     }, orgId);
   },
+
+  // ==========================================
+  // Demo & Analytics API (for investor demos)
+  // ==========================================
+
+  // Demo scenarios
+  async simulateIssue(scenario: DemoScenario): Promise<DemoIssueResponse> {
+    return apiRequest(`/api/demo/simulate-issue?scenario=${scenario}`);
+  },
+
+  // Analytics
+  async getAnalyticsOverview(): Promise<AnalyticsOverview> {
+    return apiRequest('/api/analytics/overview');
+  },
+
+  async getResolutionStats(): Promise<AnalyticsOverview['resolution']> {
+    return apiRequest('/api/analytics/resolution');
+  },
+
+  async getCategoryBreakdown(): Promise<AnalyticsOverview['categories']> {
+    return apiRequest('/api/analytics/categories');
+  },
+
+  async getResponseTimeStats(): Promise<AnalyticsOverview['response_times']> {
+    return apiRequest('/api/analytics/response-times');
+  },
+};
+
+// ==========================================
+// Types for Demo & Analytics
+// ==========================================
+
+type DemoScenario = 'washing_machine' | 'emergency' | 'heating' | 'plumbing';
+
+type DemoIssueResponse = {
+  issue_id: number;
+  scenario: string;
+  status: string;
+  message: string;
+  next_steps: string[];
+};
+
+type AnalyticsOverview = {
+  resolution: {
+    total_issues: number;
+    resolved_by_agent: number;
+    escalated: number;
+    resolution_rate: number;
+    estimated_savings: number;
+    avg_callout_cost: number;
+  };
+  categories: Array<{
+    category: string;
+    total: number;
+    resolved: number;
+    escalated: number;
+  }>;
+  response_times: {
+    avg_response_seconds: number;
+    avg_response_formatted: string;
+  };
+  highlights: {
+    ai_resolution_rate: string;
+    total_savings: string;
+    avg_response_time: string;
+    issues_handled: number;
+  };
 };
 
 export type {
   AgentActivity,
+  AnalyticsOverview,
   CreateIssueRequest,
   CreatePropertyRequest,
   CreateTenantRequest,
+  DemoIssueResponse,
+  DemoScenario,
   Issue,
   IssueMessage,
   Property,

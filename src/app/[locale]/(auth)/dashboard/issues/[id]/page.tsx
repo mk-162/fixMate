@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { TitleBar } from '@/features/dashboard/TitleBar';
 import { type AgentActivity, FixmateAPI, type Issue, type IssueMessage } from '@/libs/FixmateAPI';
 
@@ -43,6 +44,9 @@ export default function IssueDetailPage() {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [pmNotes, setPmNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesChanged, setNotesChanged] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -56,12 +60,16 @@ export default function IssueDetailPage() {
       setIssue(issueData);
       setMessages(messagesData);
       setActivity(activityData);
+      // Only set pmNotes if not currently being edited
+      if (!notesChanged) {
+        setPmNotes(issueData.pm_notes || '');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load issue');
     } finally {
       setLoading(false);
     }
-  }, [issueId]);
+  }, [issueId, notesChanged]);
 
   useEffect(() => {
     fetchData();
@@ -91,6 +99,27 @@ export default function IssueDetailPage() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleSaveNotes() {
+    if (savingNotes) {
+      return;
+    }
+
+    setSavingNotes(true);
+    try {
+      await FixmateAPI.updateIssueNotes(issueId, pmNotes);
+      setNotesChanged(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  }
+
+  function handleNotesChange(value: string) {
+    setPmNotes(value);
+    setNotesChanged(true);
   }
 
   if (loading) {
@@ -212,6 +241,30 @@ export default function IssueDetailPage() {
                   </span>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* PM Notes */}
+          <div className="rounded-lg bg-white p-4 shadow">
+            <h3 className="mb-3 font-semibold">Internal Notes</h3>
+            <Textarea
+              value={pmNotes}
+              onChange={e => handleNotesChange(e.target.value)}
+              placeholder="Add private notes about this issue (only visible to staff)..."
+              rows={4}
+              className="mb-2 text-sm"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                {notesChanged ? 'Unsaved changes' : 'Auto-saved'}
+              </span>
+              <Button
+                size="sm"
+                onClick={handleSaveNotes}
+                disabled={savingNotes || !notesChanged}
+              >
+                {savingNotes ? 'Saving...' : 'Save Notes'}
+              </Button>
             </div>
           </div>
 

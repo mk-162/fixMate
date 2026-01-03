@@ -13,12 +13,13 @@ type PMIssueQueueProps = {
   loading?: boolean;
   onAssign: (issue: Issue) => void;
   onClose: (issue: Issue) => void;
+  onStatusChange?: (issue: Issue, newStatus: string) => void;
 };
 
 type FilterTab = 'needs_action' | 'all_active' | 'resolved' | 'closed';
 type SortOption = 'newest' | 'oldest' | 'priority';
 
-export function PMIssueQueue({ issues, loading, onAssign, onClose }: PMIssueQueueProps) {
+export function PMIssueQueue({ issues, loading, onAssign, onClose, onStatusChange }: PMIssueQueueProps) {
   const [activeTab, setActiveTab] = useState<FilterTab>('needs_action');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -273,6 +274,7 @@ export function PMIssueQueue({ issues, loading, onAssign, onClose }: PMIssueQueu
                   issue={issue}
                   onAssign={onAssign}
                   onClose={onClose}
+                  onStatusChange={onStatusChange}
                 />
               ))}
             </div>

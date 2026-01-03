@@ -43,3 +43,18 @@ export const PM_ACTION_STATUSES = ['escalated', 'assigned', 'in_progress', 'awai
 
 // All active (non-closed) statuses
 export const ACTIVE_STATUSES = ['new', 'triaging', 'resolved_by_agent', 'escalated', 'assigned', 'in_progress', 'awaiting_confirmation'];
+
+// Category configurations with colors and icons
+export const categoryConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  plumbing: { label: 'Plumbing', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  electrical: { label: 'Electrical', color: 'text-amber-600', bgColor: 'bg-amber-100' },
+  appliance: { label: 'Appliance', color: 'text-violet-600', bgColor: 'bg-violet-100' },
+  heating: { label: 'Heating', color: 'text-orange-600', bgColor: 'bg-orange-100' },
+  hvac: { label: 'HVAC', color: 'text-cyan-600', bgColor: 'bg-cyan-100' },
+  structural: { label: 'Structural', color: 'text-rose-600', bgColor: 'bg-rose-100' },
+  pest: { label: 'Pest Control', color: 'text-lime-600', bgColor: 'bg-lime-100' },
+  cleaning: { label: 'Cleaning', color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
+  security: { label: 'Security', color: 'text-red-600', bgColor: 'bg-red-100' },
+  exterior: { label: 'Exterior', color: 'text-green-600', bgColor: 'bg-green-100' },
+  general: { label: 'General', color: 'text-slate-600', bgColor: 'bg-slate-100' },
+};

@@ -1,10 +1,26 @@
 'use client';
 
-import { Building2, ClipboardList, MessageSquare, Sparkles, TrendingUp, Wrench } from 'lucide-react';
+import {
+  Building2,
+  ClipboardList,
+  DollarSign,
+  Home,
+  MessageSquare,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  type DashboardStats,
+  getDashboardStats,
+  getPropertiesWithStats,
+  type PropertyWithStats,
+} from '@/features/dashboard/actions/dashboardActions';
 import { TitleBar } from '@/features/dashboard/TitleBar';
 import { FixmateAPI, type Issue } from '@/libs/FixmateAPI';
 
@@ -12,16 +28,19 @@ type StatCardProps = {
   label: string;
   value: number | string;
   icon: React.ReactNode;
-  color: 'teal' | 'emerald' | 'amber' | 'violet';
+  color: 'teal' | 'emerald' | 'amber' | 'violet' | 'blue' | 'rose';
   href?: string;
+  subtext?: string;
 };
 
-function StatCard({ label, value, icon, color, href }: StatCardProps) {
+function StatCard({ label, value, icon, color, href, subtext }: StatCardProps) {
   const colorClasses = {
     teal: 'bg-primary/10 text-primary border-primary/20',
     emerald: 'bg-emerald-50 text-emerald-600 border-emerald-200',
     amber: 'bg-amber-50 text-amber-600 border-amber-200',
     violet: 'bg-violet-50 text-violet-600 border-violet-200',
+    blue: 'bg-blue-50 text-blue-600 border-blue-200',
+    rose: 'bg-rose-50 text-rose-600 border-rose-200',
   };
 
   const content = (
@@ -30,6 +49,7 @@ function StatCard({ label, value, icon, color, href }: StatCardProps) {
         <div>
           <p className="text-sm font-medium opacity-80">{label}</p>
           <p className="mt-1 text-3xl font-bold">{value}</p>
+          {subtext && <p className="mt-0.5 text-xs opacity-70">{subtext}</p>}
         </div>
         <div className="rounded-lg bg-white/60 p-2.5">
           {icon}
@@ -64,17 +84,70 @@ function QuickAction({ title, description, icon, href }: QuickActionProps) {
   );
 }
 
+function PropertyCard({ property }: { property: PropertyWithStats }) {
+  return (
+    <Link href={`/dashboard/properties/${property.id}`}>
+      <div className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-md">
+        <div className="flex items-start justify-between">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-semibold text-foreground">{property.name}</h3>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{property.address}</p>
+          </div>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+            property.status === 'occupied'
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'
+          }`}
+          >
+            {property.status}
+          </span>
+        </div>
+        <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Users className="size-3.5" />
+            {property.tenantCount}
+            {' '}
+            tenants
+          </span>
+          <span className="flex items-center gap-1">
+            <Home className="size-3.5" />
+            {property.totalRooms}
+            {' '}
+            rooms
+          </span>
+          {property.activeIssueCount > 0 && (
+            <span className="flex items-center gap-1 text-amber-600">
+              <Wrench className="size-3.5" />
+              {property.activeIssueCount}
+              {' '}
+              issues
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export default function DashboardIndexPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [properties, setProperties] = useState<PropertyWithStats[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const data = await FixmateAPI.listIssues();
-        setIssues(data);
-      } catch {
-        // Silently fail for dashboard stats
+        const [statsData, propertiesData, issuesData] = await Promise.all([
+          getDashboardStats(),
+          getPropertiesWithStats(),
+          FixmateAPI.listIssues().catch(() => []),
+        ]);
+        setStats(statsData);
+        setProperties(propertiesData);
+        setIssues(issuesData);
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
       } finally {
         setLoading(false);
       }
@@ -82,46 +155,103 @@ export default function DashboardIndexPage() {
     fetchData();
   }, []);
 
-  const activeIssues = issues.filter(i => !['closed', 'resolved_by_agent'].includes(i.status));
-  const resolvedByAI = issues.filter(i => i.status === 'resolved_by_agent').length;
-  const escalated = issues.filter(i => i.status === 'escalated').length;
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
 
   return (
     <>
       <TitleBar
-        title="Welcome to FixMate"
-        description="Your AI-powered property maintenance assistant"
+        title="Dashboard"
+        description="Your property portfolio at a glance"
       />
 
-      {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Active Issues"
-          value={loading ? '—' : activeIssues.length}
-          icon={<ClipboardList className="size-5" />}
-          color="teal"
-          href="/dashboard/issues"
-        />
-        <StatCard
-          label="Needs Attention"
-          value={loading ? '—' : escalated}
-          icon={<Wrench className="size-5" />}
-          color="amber"
-          href="/dashboard/pm-dashboard"
-        />
-        <StatCard
-          label="Resolved by AI"
-          value={loading ? '—' : resolvedByAI}
-          icon={<Sparkles className="size-5" />}
-          color="emerald"
-        />
-        <StatCard
-          label="Resolution Rate"
-          value={loading || issues.length === 0 ? '—' : `${Math.round((resolvedByAI / Math.max(issues.length, 1)) * 100)}%`}
-          icon={<TrendingUp className="size-5" />}
-          color="violet"
-        />
+      {/* Portfolio Overview */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Portfolio Overview</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Properties"
+            value={loading ? '—' : stats?.propertyCount ?? 0}
+            icon={<Building2 className="size-5" />}
+            color="blue"
+            href="/dashboard/properties"
+            subtext={loading ? '' : `${stats?.totalRooms ?? 0} total rooms`}
+          />
+          <StatCard
+            label="Tenants"
+            value={loading ? '—' : stats?.tenantCount ?? 0}
+            icon={<Users className="size-5" />}
+            color="violet"
+            href="/dashboard/tenants"
+            subtext={loading ? '' : `${stats?.occupancyRate ?? 0}% occupancy`}
+          />
+          <StatCard
+            label="Monthly Rent"
+            value={loading ? '—' : formatCurrency(stats?.totalMonthlyRent ?? 0)}
+            icon={<DollarSign className="size-5" />}
+            color="emerald"
+            subtext="Expected income"
+          />
+          <StatCard
+            label="Active Issues"
+            value={loading ? '—' : stats?.activeIssues ?? 0}
+            icon={<ClipboardList className="size-5" />}
+            color={!loading && (stats?.activeIssues ?? 0) > 0 ? 'amber' : 'teal'}
+            href="/dashboard/issues"
+            subtext={loading ? '' : `${stats?.escalatedIssues ?? 0} need attention`}
+          />
+        </div>
       </div>
+
+      {/* AI Performance */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">AI Performance</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Resolved by AI"
+            value={loading ? '—' : stats?.resolvedByAI ?? 0}
+            icon={<Sparkles className="size-5" />}
+            color="emerald"
+          />
+          <StatCard
+            label="Resolution Rate"
+            value={loading ? '—' : `${stats?.resolutionRate ?? 0}%`}
+            icon={<TrendingUp className="size-5" />}
+            color="violet"
+          />
+          <StatCard
+            label="Needs Attention"
+            value={loading ? '—' : stats?.escalatedIssues ?? 0}
+            icon={<Wrench className="size-5" />}
+            color="amber"
+            href="/dashboard/pm-dashboard"
+          />
+        </div>
+      </div>
+
+      {/* Properties Summary */}
+      {properties.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Your Properties</h2>
+            <Link href="/dashboard/properties">
+              <Button variant="ghost" size="sm" className="text-primary">
+                View all
+              </Button>
+            </Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {properties.slice(0, 6).map(property => (
+              <PropertyCard key={property.id} property={property} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="mb-8">
@@ -154,7 +284,7 @@ export default function DashboardIndexPage() {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Issues */}
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Recent Issues</h2>

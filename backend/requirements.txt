@@ -8,8 +8,9 @@ asyncpg>=0.29.0
 sqlalchemy>=2.0.0
 databases>=0.9.0
 
-# Anthropic / Claude
+# Anthropic / Claude Agent SDK
 anthropic>=0.40.0
+claude-agent-sdk>=0.1.18
 
 # Utilities
 pydantic>=2.5.0

@@ -60,6 +60,15 @@ export default function PMDashboardPage() {
     await fetchIssues();
   };
 
+  const handleStatusChange = async (issue: Issue, newStatus: string) => {
+    try {
+      await FixmateAPI.updateIssueStatus(issue.id, newStatus);
+      await fetchIssues();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update status');
+    }
+  };
+
   return (
     <>
       <TitleBar
@@ -107,6 +116,7 @@ export default function PMDashboardPage() {
             loading={loading}
             onAssign={handleAssignClick}
             onClose={handleCloseClick}
+            onStatusChange={handleStatusChange}
           />
         </section>
       </div>

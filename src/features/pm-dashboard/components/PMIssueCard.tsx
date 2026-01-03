@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import type { Issue } from '@/libs/FixmateAPI';
 
 import { priorityColors, priorityLabels, statusColors, statusLabels } from '../constants';
+import { CategoryBadge } from './CategoryBadge';
 
 type PMIssueCardProps = {
   issue: Issue;
   onAssign: (issue: Issue) => void;
   onClose: (issue: Issue) => void;
+  onStatusChange?: (issue: Issue, newStatus: string) => void;
 };
 
 function formatTimeAgo(dateString: string): string {
@@ -37,10 +39,17 @@ function formatTimeAgo(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-export function PMIssueCard({ issue, onAssign, onClose }: PMIssueCardProps) {
+export function PMIssueCard({ issue, onAssign, onClose, onStatusChange }: PMIssueCardProps) {
   const canAssign = ['escalated', 'new'].includes(issue.status);
   const canClose = ['assigned', 'in_progress', 'awaiting_confirmation', 'resolved_by_agent'].includes(issue.status);
   const isUrgent = issue.priority === 'urgent' || issue.priority === 'high';
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value;
+    if (newStatus !== issue.status && onStatusChange) {
+      onStatusChange(issue, newStatus);
+    }
+  };
 
   return (
     <div
@@ -86,16 +95,25 @@ export function PMIssueCard({ issue, onAssign, onClose }: PMIssueCardProps) {
 
         {/* Category and Status */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Badge className={`border text-xs ${statusColors[issue.status]}`}>
-            {statusLabels[issue.status] || issue.status}
-          </Badge>
-          {issue.category && (
-            <span className="text-xs text-slate-500">
-              &middot;
-              {' '}
-              {issue.category}
-            </span>
-          )}
+          {onStatusChange
+            ? (
+                <select
+                  value={issue.status}
+                  onChange={handleStatusChange}
+                  className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-teal-200 ${statusColors[issue.status]}`}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              )
+            : (
+                <Badge className={`border text-xs ${statusColors[issue.status]}`}>
+                  {statusLabels[issue.status] || issue.status}
+                </Badge>
+              )}
+          <CategoryBadge category={issue.category} />
           {issue.assigned_to && (
             <span className="flex items-center gap-1 text-xs text-violet-600">
               <svg className="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
