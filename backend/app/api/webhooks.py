@@ -1,0 +1,519 @@
+"""Webhook handlers for external integrations."""
+import os
+import hmac
+import hashlib
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Form
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
+from typing import Optional, Any
+from datetime import datetime
+
+from app.db import issues, messages, activity
+from app.db.whatsapp import whatsapp_conversations
+from app.agents import TriageAgent
+from app.integrations import respondio_client, twilio_client
+
+router = APIRouter()
+triage_agent = TriageAgent()
+
+
+class RespondIOWebhookPayload(BaseModel):
+    """Respond.io webhook payload structure."""
+    event: str  # e.g., "message:received", "message:sent"
+    timestamp: str
+    data: dict
+
+
+class IncomingMessage(BaseModel):
+    """Structure for incoming message data."""
+    contact_id: str
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    message_id: str
+    message_type: str  # text, image, document, etc.
+    text: Optional[str] = None
+    channel: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+def verify_webhook_signature(payload: bytes, signature: str) -> bool:
+    """
+    Verify Respond.io webhook signature.
+
+    Respond.io signs webhooks with HMAC-SHA256.
+    """
+    secret = os.getenv("RESPONDIO_WEBHOOK_SECRET", "")
+    if not secret:
+        # If no secret configured, skip verification (dev mode)
+        return True
+
+    expected = hmac.new(
+        secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(expected, signature)
+
+
+async def process_whatsapp_message(message: IncomingMessage):
+    """
+    Process an incoming WhatsApp message.
+
+    Routes to existing conversation or creates new issue.
+    """
+    # Skip non-text messages for now (could handle images later)
+    if message.message_type != "text" or not message.text:
+        return
+
+    # Check if we have an active conversation for this contact
+    conversation = await whatsapp_conversations.get_active_conversation(
+        message.contact_id
+    )
+
+    if conversation:
+        # Continue existing conversation
+        issue_id = conversation["issue_id"]
+
+        # Record the message
+        await messages.add_message(issue_id, "tenant", message.text)
+
+        # Log activity
+        await activity.log_activity(
+            issue_id,
+            "whatsapp_message_received",
+            {
+                "contact_id": message.contact_id,
+                "message_preview": message.text[:100],
+            }
+        )
+
+        # Trigger agent response
+        try:
+            await triage_agent.handle_tenant_response(issue_id, message.text)
+
+            # Send agent's response back via WhatsApp
+            await send_agent_response_to_whatsapp(issue_id, message.contact_id)
+
+        except Exception as e:
+            await activity.log_activity(
+                issue_id,
+                "agent_error",
+                {"error": str(e), "source": "whatsapp"}
+            )
+            # Send error message to user
+            await respondio_client.send_message(
+                message.contact_id,
+                "Sorry, I'm having trouble processing your message. "
+                "Please try again or contact your property manager directly."
+            )
+    else:
+        # New conversation - create an issue
+        await handle_new_whatsapp_issue(message)
+
+
+async def handle_new_whatsapp_issue(message: IncomingMessage):
+    """Handle a new issue reported via WhatsApp."""
+
+    # Try to find tenant by phone number
+    tenant = await whatsapp_conversations.get_tenant_by_phone(message.phone)
+
+    if not tenant:
+        # Unknown number - ask them to register or provide details
+        await respondio_client.send_message(
+            message.contact_id,
+            "Hi! I'm FixMate, your property maintenance assistant. "
+            "I don't have your phone number on file yet.\n\n"
+            "Please reply with your name and the property address you're renting, "
+            "and I'll get you set up!"
+        )
+
+        # Create a pending registration conversation
+        await whatsapp_conversations.create_pending_registration(
+            contact_id=message.contact_id,
+            phone=message.phone,
+            initial_message=message.text,
+        )
+        return
+
+    # Create new issue from the message
+    issue = await issues.create_issue(
+        tenant_id=tenant["id"],
+        property_id=tenant["property_id"],
+        title=f"WhatsApp: {message.text[:50]}...",
+        description=message.text,
+        category=None,  # Agent will categorize
+    )
+
+    # Create the WhatsApp conversation record
+    await whatsapp_conversations.create_conversation(
+        contact_id=message.contact_id,
+        phone=message.phone,
+        tenant_id=tenant["id"],
+        issue_id=issue["id"],
+    )
+
+    # Record the initial message
+    await messages.add_message(
+        issue["id"],
+        "tenant",
+        f"[Via WhatsApp] {message.text}"
+    )
+
+    # Log activity
+    await activity.log_activity(
+        issue["id"],
+        "issue_created_via_whatsapp",
+        {
+            "contact_id": message.contact_id,
+            "phone": message.phone,
+        }
+    )
+
+    # Trigger the triage agent
+    try:
+        await triage_agent.handle_new_issue(issue["id"])
+
+        # Send agent's response back via WhatsApp
+        await send_agent_response_to_whatsapp(issue["id"], message.contact_id)
+
+    except Exception as e:
+        await activity.log_activity(
+            issue["id"],
+            "agent_error",
+            {"error": str(e), "source": "whatsapp"}
+        )
+        await respondio_client.send_message(
+            message.contact_id,
+            "Thanks for reporting this issue! I'll look into it and get back to you shortly."
+        )
+
+
+async def send_agent_response_to_whatsapp(issue_id: int, contact_id: str):
+    """
+    Get the latest agent message and send it to WhatsApp.
+    """
+    # Get recent messages
+    recent_messages = await messages.get_messages(issue_id, limit=5)
+
+    # Find the most recent agent message
+    for msg in reversed(recent_messages):
+        if msg["role"] == "agent":
+            result = await respondio_client.send_message(
+                contact_id,
+                msg["content"]
+            )
+
+            if result.get("sent"):
+                await activity.log_activity(
+                    issue_id,
+                    "whatsapp_message_sent",
+                    {"contact_id": contact_id, "message_preview": msg["content"][:100]}
+                )
+            break
+
+
+# Webhook endpoint
+@router.post("/webhooks/respondio")
+async def respondio_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Handle incoming webhooks from Respond.io.
+
+    Must respond within 5 seconds to avoid timeout.
+    Heavy processing is done in background tasks.
+    """
+    # Get raw body for signature verification
+    body = await request.body()
+
+    # Verify signature
+    signature = request.headers.get("X-Respond-Signature", "")
+    if not verify_webhook_signature(body, signature):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    # Parse payload
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    event_type = payload.get("event", "")
+    data = payload.get("data", {})
+
+    # Only process incoming messages
+    if event_type == "message:received":
+        # Extract message details
+        message = IncomingMessage(
+            contact_id=data.get("contact", {}).get("id", ""),
+            contact_name=data.get("contact", {}).get("name"),
+            phone=data.get("contact", {}).get("phone"),
+            message_id=data.get("message", {}).get("id", ""),
+            message_type=data.get("message", {}).get("type", "text"),
+            text=data.get("message", {}).get("text"),
+            channel=data.get("channel", {}).get("type"),
+            metadata=data,
+        )
+
+        # Process in background to respond quickly
+        background_tasks.add_task(process_whatsapp_message, message)
+
+    # Always respond quickly with 200 OK
+    return {"status": "ok", "event": event_type}
+
+
+@router.get("/webhooks/respondio")
+async def respondio_webhook_verify(request: Request):
+    """
+    Verification endpoint for Respond.io webhook setup.
+
+    Some webhook providers send a GET request to verify the endpoint.
+    """
+    return {"status": "ok", "service": "FixMate WhatsApp Integration"}
+
+
+# =============================================================================
+# TWILIO WHATSAPP SANDBOX WEBHOOK
+# =============================================================================
+
+def parse_twilio_phone(twilio_from: str) -> str:
+    """
+    Parse phone number from Twilio format.
+
+    Twilio sends: 'whatsapp:+447123456789'
+    We want: '+447123456789'
+    """
+    if twilio_from.startswith("whatsapp:"):
+        return twilio_from[9:]  # Remove 'whatsapp:' prefix
+    return twilio_from
+
+
+async def process_twilio_message(
+    from_number: str,
+    body: str,
+    message_sid: str,
+):
+    """
+    Process an incoming WhatsApp message from Twilio.
+
+    Similar to process_whatsapp_message but uses phone as contact_id.
+    """
+    phone = parse_twilio_phone(from_number)
+
+    # Use phone number as contact_id for Twilio
+    contact_id = phone
+
+    # Check if we have an active conversation for this phone
+    conversation = await whatsapp_conversations.get_active_conversation(contact_id)
+
+    if conversation:
+        # Continue existing conversation
+        issue_id = conversation["issue_id"]
+
+        # Record the message
+        await messages.add_message(issue_id, "tenant", body)
+
+        # Log activity
+        await activity.log_activity(
+            issue_id,
+            "whatsapp_message_received",
+            {
+                "phone": phone,
+                "message_sid": message_sid,
+                "message_preview": body[:100],
+            }
+        )
+
+        # Trigger agent response
+        try:
+            await triage_agent.handle_tenant_response(issue_id, body)
+
+            # Send agent's response back via WhatsApp
+            await send_twilio_agent_response(issue_id, phone)
+
+        except Exception as e:
+            await activity.log_activity(
+                issue_id,
+                "agent_error",
+                {"error": str(e), "source": "twilio_whatsapp"}
+            )
+            # Send error message to user
+            await twilio_client.send_message(
+                phone,
+                "Sorry, I'm having trouble processing your message. "
+                "Please try again or contact your property manager directly."
+            )
+    else:
+        # New conversation - create an issue
+        await handle_new_twilio_issue(phone, body, message_sid)
+
+
+async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
+    """Handle a new issue reported via Twilio WhatsApp."""
+
+    # Try to find tenant by phone number
+    tenant = await whatsapp_conversations.get_tenant_by_phone(phone)
+
+    if not tenant:
+        # Unknown number - ask them to register or provide details
+        await twilio_client.send_message(
+            phone,
+            "Hi! I'm FixMate, your property maintenance assistant. "
+            "I don't have your phone number on file yet.\n\n"
+            "Please reply with your name and the property address you're renting, "
+            "and I'll get you set up!"
+        )
+
+        # Create a pending registration conversation
+        await whatsapp_conversations.create_pending_registration(
+            contact_id=phone,  # Use phone as contact_id for Twilio
+            phone=phone,
+            initial_message=body,
+        )
+        return
+
+    # Create new issue from the message
+    issue = await issues.create_issue(
+        tenant_id=tenant["id"],
+        property_id=tenant["property_id"],
+        title=f"WhatsApp: {body[:50]}..." if len(body) > 50 else f"WhatsApp: {body}",
+        description=body,
+        category=None,  # Agent will categorize
+    )
+
+    # Create the WhatsApp conversation record
+    await whatsapp_conversations.create_conversation(
+        contact_id=phone,  # Use phone as contact_id for Twilio
+        phone=phone,
+        tenant_id=tenant["id"],
+        issue_id=issue["id"],
+    )
+
+    # Record the initial message
+    await messages.add_message(
+        issue["id"],
+        "tenant",
+        f"[Via WhatsApp] {body}"
+    )
+
+    # Log activity
+    await activity.log_activity(
+        issue["id"],
+        "issue_created_via_whatsapp",
+        {
+            "phone": phone,
+            "message_sid": message_sid,
+        }
+    )
+
+    # Trigger the triage agent
+    try:
+        await triage_agent.handle_new_issue(issue["id"])
+
+        # Send agent's response back via WhatsApp
+        await send_twilio_agent_response(issue["id"], phone)
+
+    except Exception as e:
+        await activity.log_activity(
+            issue["id"],
+            "agent_error",
+            {"error": str(e), "source": "twilio_whatsapp"}
+        )
+        await twilio_client.send_message(
+            phone,
+            "Thanks for reporting this issue! I'll look into it and get back to you shortly."
+        )
+
+
+async def send_twilio_agent_response(issue_id: int, phone: str):
+    """
+    Get the latest agent message and send it via Twilio WhatsApp.
+    """
+    # Get recent messages
+    recent_messages = await messages.get_messages(issue_id, limit=5)
+
+    # Find the most recent agent message
+    for msg in reversed(recent_messages):
+        if msg["role"] == "agent":
+            result = await twilio_client.send_message(
+                phone,
+                msg["content"]
+            )
+
+            if result.get("sent"):
+                await activity.log_activity(
+                    issue_id,
+                    "whatsapp_message_sent",
+                    {
+                        "phone": phone,
+                        "message_sid": result.get("message_sid"),
+                        "message_preview": msg["content"][:100],
+                    }
+                )
+            else:
+                await activity.log_activity(
+                    issue_id,
+                    "whatsapp_send_failed",
+                    {
+                        "phone": phone,
+                        "error": result.get("error"),
+                    }
+                )
+            break
+
+
+@router.post("/webhooks/twilio", response_class=PlainTextResponse)
+async def twilio_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Handle incoming webhooks from Twilio WhatsApp Sandbox.
+
+    Twilio sends form-encoded data, not JSON.
+    Must respond with TwiML or empty 200 to acknowledge.
+    """
+    # Get form data
+    form_data = await request.form()
+
+    # Validate the request is from Twilio (optional but recommended)
+    signature = request.headers.get("X-Twilio-Signature", "")
+    if twilio_client.is_configured():
+        # Build URL for validation
+        url = str(request.url)
+        params = {key: form_data[key] for key in form_data}
+
+        if not twilio_client.validate_request(url, params, signature):
+            # Log but don't reject in sandbox mode
+            print(f"Warning: Twilio signature validation failed for {url}")
+
+    # Extract message details
+    from_number = form_data.get("From", "")
+    body = form_data.get("Body", "")
+    message_sid = form_data.get("MessageSid", "")
+
+    # Only process if we have a message
+    if from_number and body:
+        # Process in background to respond quickly
+        background_tasks.add_task(
+            process_twilio_message,
+            from_number,
+            body,
+            message_sid,
+        )
+
+    # Return empty TwiML response (acknowledges receipt, no auto-reply)
+    return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+
+
+@router.get("/webhooks/twilio")
+async def twilio_webhook_verify():
+    """
+    Health check endpoint for Twilio webhook.
+    """
+    return {
+        "status": "ok",
+        "service": "FixMate Twilio WhatsApp Integration",
+        "configured": twilio_client.is_configured(),
+    }

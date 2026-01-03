@@ -14,3 +14,7 @@ anthropic>=0.40.0
 # Utilities
 pydantic>=2.5.0
 httpx>=0.26.0
+
+# Twilio WhatsApp Integration
+twilio>=8.10.0
+python-multipart>=0.0.6
