@@ -1,3 +1,15 @@
+# [1.7.0](https://github.com/mk-162/fixMate/compare/v1.6.0...v1.7.0) (2026-01-03)
+
+
+### Bug Fixes
+
+* properties dropdown works with both Drizzle and Railway schemas ([0f2f2c7](https://github.com/mk-162/fixMate/commit/0f2f2c7436bc11b60f82e8811b29ac2c06274ea8))
+
+
+### Features
+
+* add Tenants to nav, rename Members to Team ([ec9d491](https://github.com/mk-162/fixMate/commit/ec9d4911139994bc6018463b51dbb45a9875b321))
+
 # [1.6.0](https://github.com/mk-162/fixMate/compare/v1.5.3...v1.6.0) (2026-01-03)
 
 
