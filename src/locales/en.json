@@ -89,8 +89,10 @@
   "DashboardLayout": {
     "home": "Home",
     "properties": "Properties",
+    "tenants": "Tenants",
     "todos": "Todos",
     "members": "Members",
+    "team": "Team",
     "billing": "Billing",
     "settings": "Settings"
   },
