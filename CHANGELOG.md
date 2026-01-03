@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/mk-162/fixMate/compare/v1.5.3...v1.6.0) (2026-01-03)
+
+
+### Features
+
+* improve WhatsApp UX with quick wins ([8e74851](https://github.com/mk-162/fixMate/commit/8e748519fc6aece47c1fa5c95b80dcf64999e963))
+
 ## [1.5.3](https://github.com/mk-162/fixMate/compare/v1.5.2...v1.5.3) (2026-01-03)
 
 
