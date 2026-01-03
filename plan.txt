@@ -1,0 +1,173 @@
+Here’s a **plain-English, build-focused summary** of what the **Claude Agent SDK** actually does, framed for your FixMate-style system.
+
+---
+
+## **What the Claude Agent SDK Does (In Practice)**
+
+The Claude Agent SDK lets you build **long-running, stateful AI agents** that can **reason, plan, take actions, observe results, and continue working** over time — instead of just answering one prompt and stopping.
+
+Think of it as the difference between:
+
+* ❌ a chatbot that replies once
+* ✅ a **digital worker** that manages a workflow
+
+---
+
+## **Core Capabilities (Mapped to Your Use Case)**
+
+### **1. Persistent AI Agents**
+
+Claude agents:
+
+* Maintain memory across steps
+* Track task state (e.g. *follow-up pending*, *awaiting photo*, *verified*)
+* Resume work after delays (hours / days)
+
+👉 In FixMate terms:
+
+> One agent “owns” an issue from resolution → follow-ups → verification → closure.
+
+---
+
+### **2. Tool Use (Action, Not Just Text)**
+
+Agents can:
+
+* Call APIs
+* Schedule jobs
+* Write to databases
+* Trigger workflows
+* Fetch data
+* Update dashboards
+
+👉 Example actions:
+
+* Schedule a Day-7 pest follow-up
+* Store compliance score
+* Trigger landlord alert
+* Request photo re-submission
+* Escalate to tradesman callback
+
+---
+
+### **3. Multi-Step Reasoning**
+
+Agents can:
+
+* Break tasks into steps
+* Evaluate outcomes
+* Branch logic based on results
+* Decide *what to do next*
+
+👉 Example:
+
+```
+Photo received →
+Analyze hygiene →
+Score compliance →
+If <50% →
+  escalate + education
+Else →
+  schedule next check
+```
+
+This is **built-in agent logic**, not prompt hacks.
+
+---
+
+### **4. Event-Driven Workflows**
+
+Agents can be triggered by:
+
+* Time (cron / delay)
+* User responses
+* External events (API callbacks)
+* Data changes
+
+👉 Perfect for:
+
+* Follow-up matrices
+* Delayed verification
+* Multi-stage checks (Day 7 / Day 14 / Day 30)
+
+---
+
+### **5. Memory & State Management**
+
+The SDK supports:
+
+* Structured memory (JSON state)
+* Short-term reasoning memory
+* Long-term task context
+
+👉 Enables:
+
+* Compliance history per student
+* Issue timelines
+* Escalation history
+* Predictive risk inputs
+
+---
+
+### **6. Safe Autonomy (Guardrails)**
+
+You define:
+
+* What tools the agent can use
+* What it cannot do
+* Approval boundaries
+* Escalation thresholds
+
+👉 Critical for:
+
+* Legal defensibility
+* No accidental charging
+* No aggressive messaging
+* Evidence-first alerts
+
+---
+
+## **What It Is NOT**
+
+Claude Agent SDK is **not**:
+
+* A UI framework
+* A chatbot builder
+* A workflow SaaS
+* A replacement for your backend
+
+It is:
+
+> **The AI brain that runs inside your system**
+
+---
+
+## **Why It’s a Good Fit for FixMate**
+
+Because FixMate is:
+
+* Long-running
+* State-based
+* Evidence-driven
+* Multi-stage
+* Outcome-dependent
+
+Claude agents are designed exactly for:
+
+* “Check again later”
+* “Wait for evidence”
+* “Decide based on results”
+* “Escalate only if needed”
+
+---
+
+## **One-Sentence Summary**
+
+> **The Claude Agent SDK lets you build AI agents that manage real workflows over time — observing, deciding, acting, and learning — instead of just replying to messages.**
+
+If you want next, I can:
+
+* Map **one FixMate issue** (e.g. mould) to a **Claude agent lifecycle**
+* Show **what runs in Claude vs your backend**
+* Design the **agent state schema**
+* Compare Claude Agent SDK vs LangGraph / Temporal / n8n for this job

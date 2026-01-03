@@ -28,7 +28,18 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
                 href: '/dashboard',
                 label: t('home'),
               },
-              // PRO: Link to the /dashboard/todos page
+              {
+                href: '/dashboard/issues',
+                label: 'Issues',
+              },
+              {
+                href: '/dashboard/pm-dashboard',
+                label: 'PM Dashboard',
+              },
+              {
+                href: '/dashboard/properties',
+                label: t('properties'),
+              },
               {
                 href: '/dashboard/organization-profile/organization-members',
                 label: t('members'),
@@ -37,7 +48,6 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
                 href: '/dashboard/organization-profile',
                 label: t('settings'),
               },
-              // PRO: Link to the /dashboard/billing page
             ]}
           />
         </div>

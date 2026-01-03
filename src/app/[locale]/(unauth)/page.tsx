@@ -1,43 +1,19 @@
-import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
+import type { Metadata } from 'next';
 
-import { CTA } from '@/templates/CTA';
-import { DemoBanner } from '@/templates/DemoBanner';
-import { FAQ } from '@/templates/FAQ';
-import { Features } from '@/templates/Features';
-import { Footer } from '@/templates/Footer';
-import { Hero } from '@/templates/Hero';
-import { Navbar } from '@/templates/Navbar';
-import { Pricing } from '@/templates/Pricing';
-import { Sponsors } from '@/templates/Sponsors';
+import { FixMateLanding } from '@/templates/fixmate/FixMateLanding';
 
-export async function generateMetadata(props: { params: { locale: string } }) {
-  const t = await getTranslations({
-    locale: props.params.locale,
-    namespace: 'Index',
-  });
-
-  return {
-    title: t('meta_title'),
-    description: t('meta_description'),
-  };
-}
-
-const IndexPage = (props: { params: { locale: string } }) => {
-  unstable_setRequestLocale(props.params.locale);
-
-  return (
-    <>
-      <DemoBanner />
-      <Navbar />
-      <Hero />
-      <Sponsors />
-      <Features />
-      <Pricing />
-      <FAQ />
-      <CTA />
-      <Footer />
-    </>
-  );
+export const metadata: Metadata = {
+  title: 'FixMate — AI-powered tenant maintenance for property managers',
+  description:
+    'FixMate triages tenant maintenance issues via WhatsApp. Reduce callouts by 60%, cut after-hours calls, and keep tenants happy.',
+  openGraph: {
+    title: 'FixMate — AI-powered tenant maintenance for property managers',
+    description:
+      'FixMate triages tenant maintenance issues via WhatsApp. Reduce callouts by 60%, cut after-hours calls, and keep tenants happy.',
+    type: 'website',
+  },
 };
 
-export default IndexPage;
+export default function IndexPage() {
+  return <FixMateLanding />;
+}

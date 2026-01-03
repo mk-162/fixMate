@@ -8,6 +8,20 @@
       "when": 1726784321202,
       "tag": "0000_init-db",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767440969247,
+      "tag": "0001_faithful_eternals",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767445816972,
+      "tag": "0002_amusing_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

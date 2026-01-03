@@ -88,6 +88,7 @@
   },
   "DashboardLayout": {
     "home": "Home",
+    "properties": "Properties",
     "todos": "Todos",
     "members": "Members",
     "billing": "Billing",
@@ -162,5 +163,94 @@
     "message_title": "Message",
     "message_description": "Enter a detailed message for your todo.",
     "submit_button": "Submit"
+  },
+  "Properties": {
+    "title": "Properties",
+    "description": "Manage your HMO and student housing properties",
+    "addProperty": "Add Property",
+    "createTitle": "Add New Property",
+    "createDescription": "Enter the details for your new property",
+    "createSectionTitle": "Property Details",
+    "createSectionDescription": "Fill in the form below to create a new property",
+    "editTitle": "Edit Property",
+    "editDescription": "Update property information",
+    "editSectionTitle": "Property Details",
+    "editSectionDescription": "Fill in the form below to edit the property",
+    "meta": {
+      "title": "Properties | Dashboard",
+      "create": "Add Property | Dashboard",
+      "edit": "Edit Property"
+    },
+    "status": {
+      "available": "Available",
+      "occupied": "Occupied"
+    },
+    "form": {
+      "name": {
+        "label": "Property Name",
+        "placeholder": "e.g., Oak House"
+      },
+      "address": {
+        "label": "Address",
+        "placeholder": "Full property address"
+      },
+      "totalRooms": {
+        "label": "Total Rooms"
+      },
+      "monthlyRent": {
+        "label": "Monthly Rent",
+        "description": "Enter amount in pounds"
+      },
+      "status": {
+        "label": "Status",
+        "placeholder": "Select status"
+      },
+      "imageUrl": {
+        "label": "Image URL",
+        "placeholder": "https://example.com/image.jpg",
+        "description": "Optional: URL to property image"
+      },
+      "notes": {
+        "label": "Notes",
+        "placeholder": "Additional notes about this property..."
+      },
+      "create": "Create Property",
+      "update": "Save Changes",
+      "cancel": "Cancel",
+      "submitting": "Saving..."
+    },
+    "table": {
+      "name": "Name",
+      "address": "Address",
+      "totalRooms": "Rooms",
+      "monthlyRent": "Monthly Rent",
+      "status": "Status"
+    },
+    "actions": {
+      "view": "View Details",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "detail": {
+      "sectionTitle": "Property Information",
+      "sectionDescription": "View property details",
+      "address": "Address",
+      "status": "Status",
+      "totalRooms": "Total Rooms",
+      "monthlyRent": "Monthly Rent",
+      "notes": "Notes",
+      "image": "Property Image"
+    },
+    "empty": {
+      "title": "No properties yet",
+      "description": "Get started by adding your first property.",
+      "action": "Add Property"
+    },
+    "delete": {
+      "title": "Delete Property",
+      "description": "Are you sure you want to delete this property? This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    }
   }
 }
