@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/mk-162/fixMate/compare/v1.2.1...v1.3.0) (2026-01-03)
+
+
+### Features
+
+* add Twilio WhatsApp integration with webhook endpoints ([4e01a58](https://github.com/mk-162/fixMate/commit/4e01a585671ff529d4ee987a84819301c2564db2))
+
 ## [1.2.1](https://github.com/mk-162/fixMate/compare/v1.2.0...v1.2.1) (2026-01-03)
 
 
