@@ -1,3 +1,10 @@
+## [1.5.2](https://github.com/mk-162/fixMate/compare/v1.5.1...v1.5.2) (2026-01-03)
+
+
+### Bug Fixes
+
+* enforce https protocol on API base URL ([3d60876](https://github.com/mk-162/fixMate/commit/3d608761a4ce84d12bb135f1da49a2f647bee634))
+
 ## [1.5.1](https://github.com/mk-162/fixMate/compare/v1.5.0...v1.5.1) (2026-01-03)
 
 
