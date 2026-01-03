@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/mk-162/fixMate/compare/v1.4.0...v1.5.0) (2026-01-03)
+
+
+### Features
+
+* add Properties and Tenants management UI with CRUD modals ([67edc8b](https://github.com/mk-162/fixMate/commit/67edc8b5ec630494bb20026505f044e6540dae4d))
+
 # [1.4.0](https://github.com/mk-162/fixMate/compare/v1.3.1...v1.4.0) (2026-01-03)
 
 
