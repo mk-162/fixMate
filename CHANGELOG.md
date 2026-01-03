@@ -1,3 +1,10 @@
+## [1.5.3](https://github.com/mk-162/fixMate/compare/v1.5.2...v1.5.3) (2026-01-03)
+
+
+### Bug Fixes
+
+* properties page uses Server Actions instead of Railway API ([6c7b5be](https://github.com/mk-162/fixMate/commit/6c7b5beaeebf5c3ae162fff611bad93449c372f7))
+
 ## [1.5.2](https://github.com/mk-162/fixMate/compare/v1.5.1...v1.5.2) (2026-01-03)
 
 
