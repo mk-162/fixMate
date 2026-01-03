@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/mk-162/fixMate/compare/v1.3.0...v1.3.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* prevent redirect loop in middleware organization check ([0d1abcc](https://github.com/mk-162/fixMate/commit/0d1abcc71370acce7c14c27a78f4b4dd883b1ce5))
+
 # [1.3.0](https://github.com/mk-162/fixMate/compare/v1.2.1...v1.3.0) (2026-01-03)
 
 
