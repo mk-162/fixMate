@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/mk-162/fixMate/compare/v1.1.0...v1.1.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* use Python 3.12.1 for Railway compatibility ([b36db09](https://github.com/mk-162/fixMate/commit/b36db09be26ac38e842c6f0c6613a8a5da68ace8))
+
 # [1.1.0](https://github.com/mk-162/fixMate/compare/v1.0.0...v1.1.0) (2026-01-03)
 
 
