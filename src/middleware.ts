@@ -47,14 +47,17 @@ export default function middleware(
 
       const authObj = await auth();
 
+      // Only check for org on dashboard routes, NOT onboarding routes
+      // This prevents redirect loops when user needs to create/select an org
       if (
         authObj.userId
         && !authObj.orgId
         && req.nextUrl.pathname.includes('/dashboard')
-        && !req.nextUrl.pathname.endsWith('/organization-selection')
+        && !req.nextUrl.pathname.includes('/onboarding')
       ) {
+        const locale = req.nextUrl.pathname.match(/^\/([a-z]{2})\//)?.at(1) ?? '';
         const orgSelection = new URL(
-          '/onboarding/organization-selection',
+          locale ? `/${locale}/onboarding/organization-selection` : '/onboarding/organization-selection',
           req.url,
         );
 
