@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/mk-162/fixMate/compare/v1.1.1...v1.1.2) (2026-01-03)
+
+
+### Bug Fixes
+
+* add anthropic package to requirements ([05c34f8](https://github.com/mk-162/fixMate/commit/05c34f845fbfd9449f898d69ab2f690c61edf835))
+
 ## [1.1.1](https://github.com/mk-162/fixMate/compare/v1.1.0...v1.1.1) (2026-01-03)
 
 
