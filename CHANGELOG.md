@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/mk-162/fixMate/compare/v1.2.0...v1.2.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* disable auto-migrations to prevent 'already exists' errors ([8b1d9d8](https://github.com/mk-162/fixMate/commit/8b1d9d850e32f7dcc3f3a6364f1057c6ce1defb1))
+
 # [1.2.0](https://github.com/mk-162/fixMate/compare/v1.1.2...v1.2.0) (2026-01-03)
 
 
