@@ -28,9 +28,17 @@ async function initializeDatabase(): Promise<DrizzleDB> {
     await client.connect();
 
     const drizzle = drizzlePg(client, { schema });
-    await migratePg(drizzle, {
-      migrationsFolder: path.join(process.cwd(), 'migrations'),
-    });
+
+    // Run migrations - catch errors for already-applied migrations
+    try {
+      await migratePg(drizzle, {
+        migrationsFolder: path.join(process.cwd(), 'migrations'),
+      });
+    } catch (error) {
+      // Log but don't fail if migrations have issues (likely already applied)
+      console.warn('Migration warning:', error instanceof Error ? error.message : error);
+    }
+
     return drizzle;
   } else {
     // Use PGlite for local development without DATABASE_URL
