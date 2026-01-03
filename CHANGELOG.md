@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/mk-162/fixMate/compare/v1.0.0...v1.1.0) (2026-01-03)
+
+
+### Features
+
+* add Python FastAPI backend with Claude Agent SDK ([0b3f441](https://github.com/mk-162/fixMate/commit/0b3f44161eec89ea8e40032b484635fdf970dbd9))
+
 # 1.0.0 (2026-01-03)
 
 
