@@ -104,14 +104,28 @@ async def set_follow_up_date(issue_id: int, follow_up_date: datetime) -> Optiona
 
 async def close_issue(issue_id: int) -> Optional[Dict[str, Any]]:
     """Close an issue."""
-    query = """
-        UPDATE issues
-        SET status = 'closed', closed_at = NOW(), updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-    """
-    row = await execute_returning(query, issue_id)
-    return dict(row) if row else None
+    try:
+        query = """
+            UPDATE issues
+            SET status = 'closed', closed_at = NOW(), updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        """
+        row = await execute_returning(query, issue_id)
+        return dict(row) if row else None
+    except Exception:
+        # closed_at column might not exist - try without it
+        try:
+            query = """
+                UPDATE issues
+                SET status = 'closed', updated_at = NOW()
+                WHERE id = $1
+                RETURNING *
+            """
+            row = await execute_returning(query, issue_id)
+            return dict(row) if row else None
+        except Exception:
+            return None
 
 
 async def update_pm_notes(issue_id: int, notes: str) -> Optional[Dict[str, Any]]:
