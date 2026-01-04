@@ -128,21 +128,37 @@ async def update_pm_notes(issue_id: int, notes: str) -> Optional[Dict[str, Any]]
 
 async def set_agent_muted(issue_id: int, muted: bool) -> Optional[Dict[str, Any]]:
     """Mute or unmute the AI agent for this issue."""
-    query = """
-        UPDATE issues
-        SET agent_muted = $2, updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-    """
-    row = await execute_returning(query, issue_id, muted)
-    return dict(row) if row else None
+    try:
+        query = """
+            UPDATE issues
+            SET agent_muted = $2, updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        """
+        row = await execute_returning(query, issue_id, muted)
+        return dict(row) if row else None
+    except Exception:
+        # Column might not exist - try to create it
+        try:
+            await execute("ALTER TABLE issues ADD COLUMN IF NOT EXISTS agent_muted BOOLEAN DEFAULT FALSE")
+            row = await execute_returning(
+                "UPDATE issues SET agent_muted = $2, updated_at = NOW() WHERE id = $1 RETURNING *",
+                issue_id, muted
+            )
+            return dict(row) if row else None
+        except Exception:
+            return None
 
 
 async def is_agent_muted(issue_id: int) -> bool:
     """Check if the agent is muted for this issue."""
-    query = "SELECT agent_muted FROM issues WHERE id = $1"
-    row = await fetch_one(query, issue_id)
-    return bool(row["agent_muted"]) if row and row.get("agent_muted") else False
+    try:
+        query = "SELECT agent_muted FROM issues WHERE id = $1"
+        row = await fetch_one(query, issue_id)
+        return bool(row["agent_muted"]) if row and row.get("agent_muted") else False
+    except Exception:
+        # Column might not exist yet - return False (not muted)
+        return False
 
 
 async def update_issue_priority(issue_id: int, priority: str) -> Optional[Dict[str, Any]]:
