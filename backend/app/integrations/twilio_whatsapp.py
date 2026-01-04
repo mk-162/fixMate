@@ -63,6 +63,7 @@ class TwilioWhatsAppClient:
             # Twilio WhatsApp requires 'whatsapp:' prefix
             from_whatsapp = f"whatsapp:{self.whatsapp_number}"
             to_whatsapp = f"whatsapp:{to_number}"
+            print(f"[TWILIO] Sending from={from_whatsapp} to={to_whatsapp}", flush=True)
 
             msg = self.client.messages.create(
                 body=message,
