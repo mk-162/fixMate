@@ -181,6 +181,18 @@ class UpdateNotesRequest(BaseModel):
     notes: str
 
 
+class UpdatePriorityRequest(BaseModel):
+    priority: str
+
+
+class AssignIssueRequest(BaseModel):
+    assigned_to: str
+
+
+class MuteAgentRequest(BaseModel):
+    muted: bool
+
+
 @router.put("/issues/{issue_id}/status")
 async def update_issue_status(issue_id: int, request: UpdateStatusRequest):
     """Update issue status directly."""
@@ -225,6 +237,73 @@ async def update_issue_notes(issue_id: int, request: UpdateNotesRequest):
         would_notify=None
     )
     return {"status": "updated", "pm_notes": request.notes}
+
+
+@router.put("/issues/{issue_id}/priority")
+async def update_priority(issue_id: int, request: UpdatePriorityRequest):
+    """Update issue priority."""
+    valid_priorities = ["low", "medium", "high", "urgent"]
+    if request.priority not in valid_priorities:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid priority. Must be one of: {valid_priorities}"
+        )
+
+    issue = await issues.update_issue_priority(issue_id, request.priority)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    await activity.log_activity(
+        issue_id,
+        "priority_updated",
+        {"new_priority": request.priority},
+        would_notify=None
+    )
+    return {"status": "updated", "priority": request.priority}
+
+
+@router.put("/issues/{issue_id}/assign")
+async def assign_issue(issue_id: int, request: AssignIssueRequest):
+    """Assign issue to a team member."""
+    issue = await issues.assign_issue(issue_id, request.assigned_to)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    await activity.log_activity(
+        issue_id,
+        "issue_assigned",
+        {"assigned_to": request.assigned_to},
+        would_notify="tenant"
+    )
+    return {"status": "assigned", "assigned_to": request.assigned_to}
+
+
+@router.put("/issues/{issue_id}/mute-agent")
+async def mute_agent(issue_id: int, request: MuteAgentRequest):
+    """Mute or unmute the AI agent for this issue.
+
+    When muted, the AI agent will not respond to tenant messages.
+    Use this for sensitive issues that require human handling.
+    """
+    issue = await issues.set_agent_muted(issue_id, request.muted)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    action = "agent_muted" if request.muted else "agent_unmuted"
+    await activity.log_activity(
+        issue_id,
+        action,
+        {"muted": request.muted},
+        would_notify=None
+    )
+    return {"status": "updated", "agent_muted": request.muted}
+
+
+@router.get("/issues/{issue_id}/agent-status")
+async def get_agent_status(issue_id: int):
+    """Check if the AI agent is muted for this issue."""
+    muted = await issues.is_agent_muted(issue_id)
+    return {"issue_id": issue_id, "agent_muted": muted}
 
 
 # Activity feed endpoint (for dashboard)

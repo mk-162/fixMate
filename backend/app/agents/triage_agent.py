@@ -181,6 +181,16 @@ class TriageAgent:
         if not issue:
             return "Issue not found"
 
+        # Check if agent is muted for this issue
+        if await issues.is_agent_muted(issue_id):
+            await activity.log_activity(
+                issue_id,
+                "agent_skipped",
+                {"reason": "Agent is muted for this issue"},
+                would_notify=None
+            )
+            return "Agent is muted for this issue - skipping response"
+
         # Update status to triaging
         await issues.update_issue_status(issue_id, "triaging")
 
@@ -217,6 +227,16 @@ Remember: Your goal is to help resolve issues without unnecessary callouts when 
         issue = await issues.get_issue(issue_id)
         if not issue:
             return "Issue not found"
+
+        # Check if agent is muted for this issue
+        if await issues.is_agent_muted(issue_id):
+            await activity.log_activity(
+                issue_id,
+                "agent_skipped",
+                {"reason": "Agent is muted - message recorded but not responded to"},
+                would_notify=None
+            )
+            return "Agent is muted for this issue - message recorded but not responded to"
 
         conversation = await messages.get_conversation_context(issue_id)
 

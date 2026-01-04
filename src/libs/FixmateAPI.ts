@@ -27,6 +27,7 @@ type Issue = {
   assigned_to: string | null;
   follow_up_date: string | null;
   pm_notes: string | null;
+  agent_muted: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -199,6 +200,31 @@ export const FixmateAPI = {
       method: 'PUT',
       body: JSON.stringify({ notes }),
     });
+  },
+
+  async updateIssuePriority(issueId: number, priority: string): Promise<{ status: string; priority: string }> {
+    return apiRequest(`/api/issues/${issueId}/priority`, {
+      method: 'PUT',
+      body: JSON.stringify({ priority }),
+    });
+  },
+
+  async assignIssue(issueId: number, assignedTo: string): Promise<{ status: string; assigned_to: string }> {
+    return apiRequest(`/api/issues/${issueId}/assign`, {
+      method: 'PUT',
+      body: JSON.stringify({ assigned_to: assignedTo }),
+    });
+  },
+
+  async muteAgent(issueId: number, muted: boolean): Promise<{ status: string; agent_muted: boolean }> {
+    return apiRequest(`/api/issues/${issueId}/mute-agent`, {
+      method: 'PUT',
+      body: JSON.stringify({ muted }),
+    });
+  },
+
+  async getAgentStatus(issueId: number): Promise<{ issue_id: number; agent_muted: boolean }> {
+    return apiRequest(`/api/issues/${issueId}/agent-status`);
   },
 
   // ==========================================

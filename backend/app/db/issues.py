@@ -124,3 +124,46 @@ async def update_pm_notes(issue_id: int, notes: str) -> Optional[Dict[str, Any]]
     """
     row = await execute_returning(query, issue_id, notes)
     return dict(row) if row else None
+
+
+async def set_agent_muted(issue_id: int, muted: bool) -> Optional[Dict[str, Any]]:
+    """Mute or unmute the AI agent for this issue."""
+    query = """
+        UPDATE issues
+        SET agent_muted = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    """
+    row = await execute_returning(query, issue_id, muted)
+    return dict(row) if row else None
+
+
+async def is_agent_muted(issue_id: int) -> bool:
+    """Check if the agent is muted for this issue."""
+    query = "SELECT agent_muted FROM issues WHERE id = $1"
+    row = await fetch_one(query, issue_id)
+    return bool(row["agent_muted"]) if row and row.get("agent_muted") else False
+
+
+async def update_issue_priority(issue_id: int, priority: str) -> Optional[Dict[str, Any]]:
+    """Update issue priority."""
+    query = """
+        UPDATE issues
+        SET priority = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    """
+    row = await execute_returning(query, issue_id, priority)
+    return dict(row) if row else None
+
+
+async def assign_issue(issue_id: int, assigned_to: str) -> Optional[Dict[str, Any]]:
+    """Assign issue to a team member."""
+    query = """
+        UPDATE issues
+        SET assigned_to = $2, status = CASE WHEN status = 'new' THEN 'assigned' ELSE status END, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    """
+    row = await execute_returning(query, issue_id, assigned_to)
+    return dict(row) if row else None
