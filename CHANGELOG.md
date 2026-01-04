@@ -1,3 +1,10 @@
+## [1.14.5](https://github.com/mk-162/fixMate/compare/v1.14.4...v1.14.5) (2026-01-04)
+
+
+### Bug Fixes
+
+* correct isActive column type comparison (integer not boolean) ([7d8006d](https://github.com/mk-162/fixMate/commit/7d8006de774fcfc389247d606795d935b4cafc96))
+
 ## [1.14.4](https://github.com/mk-162/fixMate/compare/v1.14.3...v1.14.4) (2026-01-04)
 
 
