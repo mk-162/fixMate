@@ -1,3 +1,11 @@
+# [1.9.0](https://github.com/mk-162/fixMate/compare/v1.8.0...v1.9.0) (2026-01-04)
+
+
+### Features
+
+* add HMO student lets database schema and forms ([87bf758](https://github.com/mk-162/fixMate/commit/87bf7580920142c2329e5ea7ba92f29798f11ac2))
+* add room management and enhanced tenant forms ([36e4b3e](https://github.com/mk-162/fixMate/commit/36e4b3ef91d5a7de0fd2276ee8502f1a53314831))
+
 # [1.8.0](https://github.com/mk-162/fixMate/compare/v1.7.0...v1.8.0) (2026-01-04)
 
 
