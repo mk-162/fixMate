@@ -1,3 +1,10 @@
+## [1.12.4](https://github.com/mk-162/fixMate/compare/v1.12.3...v1.12.4) (2026-01-04)
+
+
+### Bug Fixes
+
+* improve issue chat UX - larger area, better scroll behavior ([002e775](https://github.com/mk-162/fixMate/commit/002e775c7644300a4405f6de164e5a6f710b0988))
+
 ## [1.12.3](https://github.com/mk-162/fixMate/compare/v1.12.2...v1.12.3) (2026-01-04)
 
 
