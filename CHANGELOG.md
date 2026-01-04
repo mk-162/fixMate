@@ -1,3 +1,11 @@
+## [1.10.1](https://github.com/mk-162/fixMate/compare/v1.10.0...v1.10.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* align Drizzle schema with database for tenants ([adacddb](https://github.com/mk-162/fixMate/commit/adacddb9868c611515f65157b6367a082281a969))
+* return all issues instead of only 'new' status ([2a8e495](https://github.com/mk-162/fixMate/commit/2a8e495a29ccb137a0dba97f44715da2413d0b75))
+
 # [1.10.0](https://github.com/mk-162/fixMate/compare/v1.9.1...v1.10.0) (2026-01-04)
 
 
