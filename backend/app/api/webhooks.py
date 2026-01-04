@@ -306,9 +306,14 @@ async def process_twilio_message(
     # Check for "new issue" command to force fresh start
     body_lower = body.lower().strip()
     if body_lower in ["new issue", "new problem", "start over", "reset"]:
-        print(f"[PROCESS] User requested new issue, skipping active conversation", flush=True)
+        print(f"[PROCESS] User requested new issue, closing active conversation", flush=True)
+        # Close any active conversation so next message creates a new issue
+        active_conv = await whatsapp_conversations.get_active_conversation(contact_id)
+        if active_conv:
+            await whatsapp_conversations.close_conversation(active_conv["id"])
+            print(f"[PROCESS] Closed conversation {active_conv['id']}", flush=True)
         await twilio_client.send_message(phone, "Starting a fresh conversation. What's the issue you need help with?")
-        await handle_new_twilio_issue(phone, "New issue requested via WhatsApp", message_sid)
+        # Don't create an issue yet - wait for user's next message with their actual problem
         return
 
     # Check if we have an active conversation for this phone
@@ -320,8 +325,8 @@ async def process_twilio_message(
         issue_id = conversation["issue_id"]
         print(f"[PROCESS] Continuing conversation for issue {issue_id}", flush=True)
 
-        # Record the message
-        await messages.add_message(issue_id, "tenant", body)
+        # Note: Message is recorded by triage_agent.handle_tenant_response()
+        # to avoid duplicate entries
 
         # Log activity
         await activity.log_activity(

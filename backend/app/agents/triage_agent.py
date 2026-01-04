@@ -243,8 +243,8 @@ Remember: Your goal is to help resolve issues without unnecessary callouts when 
 
         conversation = await messages.get_conversation_context(issue_id)
 
-        tenant_name = issue.get('tenant_name', 'the tenant')
-        first_name = tenant_name.split()[0] if tenant_name else 'there'
+        tenant_name = issue.get('tenant_name') or 'the tenant'
+        first_name = tenant_name.split()[0] if tenant_name and tenant_name.strip() else 'there'
         property_name = issue.get('property_name', 'their property')
 
         prompt = f"""The tenant has responded to your previous message. Continue helping them.
