@@ -18,10 +18,14 @@ class CreateIssueRequest(BaseModel):
     title: str
     description: str
     category: Optional[str] = None
+    skip_agent: Optional[bool] = False
+    priority: Optional[str] = None
+    assigned_to: Optional[str] = None
 
 
 class TenantMessageRequest(BaseModel):
     message: str
+    role: Optional[str] = "tenant"  # "tenant" or "team"
 
 
 class IssueResponse(BaseModel):
@@ -43,7 +47,11 @@ class IssueResponse(BaseModel):
 # Issue endpoints
 @router.post("/issues", response_model=dict)
 async def create_issue(request: CreateIssueRequest):
-    """Create a new maintenance issue and trigger triage agent."""
+    """Create a new maintenance issue.
+
+    If skip_agent=True (team member workflow), the issue is created with
+    status 'escalated' and no AI agent is triggered.
+    """
     # Create the issue
     issue = await issues.create_issue(
         tenant_id=request.tenant_id,
@@ -53,18 +61,47 @@ async def create_issue(request: CreateIssueRequest):
         category=request.category,
     )
 
-    # Record the initial description as a tenant message
+    # Handle team member workflow (skip AI agent)
+    if request.skip_agent:
+        # Set status to escalated and apply priority/assignment if provided
+        await issues.update_issue_status(issue["id"], "escalated")
+
+        if request.priority:
+            await issues.update_issue_priority(issue["id"], request.priority)
+
+        if request.assigned_to:
+            await issues.assign_issue(issue["id"], request.assigned_to)
+
+        # Record as system message (team member created)
+        await messages.add_message(
+            issue["id"],
+            "system",
+            f"Issue logged by team member: {request.title}\n\n{request.description}"
+        )
+
+        # Log activity
+        await activity.log_activity(
+            issue["id"],
+            "team_issue_created",
+            {
+                "priority": request.priority,
+                "assigned_to": request.assigned_to,
+            },
+            would_notify="tenant" if request.assigned_to else None
+        )
+
+        return {"id": issue["id"], "status": "created", "message": "Team issue created"}
+
+    # Standard tenant workflow - trigger AI agent
     await messages.add_message(
         issue["id"],
         "tenant",
         f"Issue reported: {request.title}\n\n{request.description}"
     )
 
-    # Trigger the triage agent
     try:
         await triage_agent.handle_new_issue(issue["id"])
     except Exception as e:
-        # Log error but don't fail the request
         await activity.log_activity(
             issue["id"],
             "agent_error",
@@ -102,23 +139,35 @@ async def list_issues(
 
 
 @router.post("/issues/{issue_id}/messages")
-async def send_tenant_message(issue_id: int, request: TenantMessageRequest):
-    """Tenant sends a message/response to the conversation."""
+async def send_message(issue_id: int, request: TenantMessageRequest):
+    """Send a message to the conversation. Role determines if agent responds."""
     issue = await issues.get_issue(issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
 
-    # Trigger agent to respond
-    try:
-        await triage_agent.handle_tenant_response(issue_id, request.message)
-    except Exception as e:
+    role = request.role or "tenant"
+
+    # Only trigger agent for tenant messages
+    if role == "tenant":
+        # Agent's handle_tenant_response adds the message
+        try:
+            await triage_agent.handle_tenant_response(issue_id, request.message)
+        except Exception as e:
+            await activity.log_activity(
+                issue_id,
+                "agent_error",
+                {"error": str(e)}
+            )
+        return {"status": "message_sent", "message": "Agent will respond shortly"}
+    else:
+        # Team message - save message and log activity, no agent response
+        await messages.add_message(issue_id, "team", request.message)
         await activity.log_activity(
             issue_id,
-            "agent_error",
-            {"error": str(e)}
+            "team_message",
+            {"message_preview": request.message[:100]}
         )
-
-    return {"status": "message_sent", "message": "Agent will respond shortly"}
+        return {"status": "message_sent", "message": "Team message recorded"}
 
 
 @router.get("/issues/{issue_id}/messages")

@@ -56,6 +56,9 @@ type CreateIssueRequest = {
   title: string;
   description: string;
   category?: string;
+  skip_agent?: boolean;
+  priority?: string;
+  assigned_to?: string;
 };
 
 // Property types

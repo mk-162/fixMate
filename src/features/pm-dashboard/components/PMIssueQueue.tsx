@@ -14,15 +14,21 @@ type PMIssueQueueProps = {
   onAssign: (issue: Issue) => void;
   onClose: (issue: Issue) => void;
   onStatusChange?: (issue: Issue, newStatus: string) => void;
+  properties?: { id: number; name: string }[];
+  tenants?: { id: number; name: string }[];
 };
 
 type FilterTab = 'needs_action' | 'all_active' | 'resolved' | 'closed';
 type SortOption = 'newest' | 'oldest' | 'priority';
 
-export function PMIssueQueue({ issues, loading, onAssign, onClose, onStatusChange }: PMIssueQueueProps) {
+export function PMIssueQueue({ issues, loading, onAssign, onClose, onStatusChange, properties: _properties, tenants: _tenants }: PMIssueQueueProps) {
   const [activeTab, setActiveTab] = useState<FilterTab>('needs_action');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [propertyFilter, _setPropertyFilter] = useState<string>('all');
+  const [tenantFilter, _setTenantFilter] = useState<string>('all');
+  const [dateFrom, _setDateFrom] = useState<string>('');
+  const [dateTo, _setDateTo] = useState<string>('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,6 +61,26 @@ export function PMIssueQueue({ issues, loading, onAssign, onClose, onStatusChang
       filtered = filtered.filter(i => i.priority === priorityFilter);
     }
 
+    // Property filter
+    if (propertyFilter !== 'all') {
+      filtered = filtered.filter(i => i.property_id === Number(propertyFilter));
+    }
+
+    // Tenant filter
+    if (tenantFilter !== 'all') {
+      filtered = filtered.filter(i => i.tenant_id === Number(tenantFilter));
+    }
+
+    // Date range filter
+    if (dateFrom) {
+      filtered = filtered.filter(i => new Date(i.created_at) >= new Date(dateFrom));
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(i => new Date(i.created_at) <= toDate);
+    }
+
     // Search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -82,7 +108,7 @@ export function PMIssueQueue({ issues, loading, onAssign, onClose, onStatusChang
     });
 
     return filtered;
-  }, [issues, activeTab, statusFilter, priorityFilter, sortBy, searchQuery]);
+  }, [issues, activeTab, statusFilter, priorityFilter, propertyFilter, tenantFilter, dateFrom, dateTo, sortBy, searchQuery]);
 
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     {
