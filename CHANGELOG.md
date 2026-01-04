@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/mk-162/fixMate/compare/v1.14.0...v1.14.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* make demo context panel scrollable ([f5379e3](https://github.com/mk-162/fixMate/commit/f5379e3f6b22de8ade4bcc70ad86a7228786d6d0))
+
 # [1.14.0](https://github.com/mk-162/fixMate/compare/v1.13.0...v1.14.0) (2026-01-04)
 
 
