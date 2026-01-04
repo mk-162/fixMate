@@ -301,9 +301,11 @@ async def process_twilio_message(
     """
     phone = parse_twilio_phone(from_number)
     contact_id = phone
+    print(f"[PROCESS] Processing message for phone={phone}", flush=True)
 
     # Check if we have an active conversation for this phone
     conversation = await whatsapp_conversations.get_active_conversation(contact_id)
+    print(f"[PROCESS] Active conversation: {conversation}", flush=True)
 
     if conversation:
         # Continue existing conversation
@@ -345,10 +347,13 @@ async def process_twilio_message(
     else:
         # Check if this is a pending registration (user responding with their details)
         pending = await whatsapp_conversations.get_pending_registration(contact_id)
+        print(f"[PROCESS] Pending registration: {pending}", flush=True)
         if pending:
+            print(f"[PROCESS] Handling registration response", flush=True)
             await handle_registration_response(phone, body, pending)
         else:
             # New conversation - create an issue or start registration
+            print(f"[PROCESS] Calling handle_new_twilio_issue", flush=True)
             await handle_new_twilio_issue(phone, body, message_sid)
 
 
