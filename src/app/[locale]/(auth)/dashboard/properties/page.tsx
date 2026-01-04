@@ -1,8 +1,10 @@
 'use client';
 
 import { Building2, Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState, useTransition } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,28 +14,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { TitleBar } from '@/features/dashboard/TitleBar';
 import {
-  createProperty,
   deleteProperty,
   getProperties,
-  updateProperty,
 } from '@/features/properties/actions/propertyActions';
 import type { Property } from '@/models/Schema';
+
+const propertyTypeLabels: Record<string, string> = {
+  hmo: 'HMO',
+  single_let: 'Single Let',
+  studio: 'Studio',
+};
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
-
-  // Form state
-  const [formName, setFormName] = useState('');
-  const [formAddress, setFormAddress] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const fetchProperties = async () => {
     try {
@@ -50,88 +48,40 @@ export default function PropertiesPage() {
     fetchProperties();
   }, []);
 
-  const handleAdd = async () => {
-    if (!formName.trim() || !formAddress.trim()) {
-      return;
-    }
-    setFormLoading(true);
-    try {
-      await createProperty({
-        name: formName.trim(),
-        address: formAddress.trim(),
-        totalRooms: 1,
-        monthlyRent: 0,
-        status: 'available',
-        propertyType: 'hmo',
-        furnished: 1,
-        hasParking: 0,
-        hasGarden: 0,
-        wifiIncluded: 0,
-        billsIncluded: 0,
-      });
-      setShowAddModal(false);
-      setFormName('');
-      setFormAddress('');
-      fetchProperties();
-    } catch (error) {
-      console.error('Failed to create property:', error);
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleEdit = async () => {
-    if (!editingProperty || !formName.trim()) {
-      return;
-    }
-    setFormLoading(true);
-    try {
-      await updateProperty(editingProperty.id, {
-        name: formName.trim(),
-        address: formAddress.trim() || undefined,
-      });
-      setEditingProperty(null);
-      setFormName('');
-      setFormAddress('');
-      fetchProperties();
-    } catch (error) {
-      console.error('Failed to update property:', error);
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!deleteConfirm) {
       return;
     }
-    setFormLoading(true);
-    try {
-      await deleteProperty(deleteConfirm.id);
-      setDeleteConfirm(null);
-      fetchProperties();
-    } catch (error) {
-      console.error('Failed to delete property:', error);
-    } finally {
-      setFormLoading(false);
-    }
+    startTransition(async () => {
+      try {
+        await deleteProperty(deleteConfirm.id);
+        setDeleteConfirm(null);
+        fetchProperties();
+      } catch (error) {
+        console.error('Failed to delete property:', error);
+      }
+    });
   };
 
-  const openEditModal = (property: Property) => {
-    setFormName(property.name);
-    setFormAddress(property.address || '');
-    setEditingProperty(property);
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 0,
+    }).format(amount);
   };
 
   return (
     <>
       <TitleBar
         title="Properties"
-        description="Manage your rental properties"
+        description="Manage your HMO rental properties"
         action={(
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus className="mr-2 size-4" />
-            Add Property
+          <Button asChild>
+            <Link href="/dashboard/properties/new">
+              <Plus className="mr-2 size-4" />
+              Add Property
+            </Link>
           </Button>
         )}
       />
@@ -148,11 +98,13 @@ export default function PropertiesPage() {
                 <Building2 className="mx-auto size-12 text-muted-foreground/50" />
                 <p className="mt-4 text-lg font-medium text-foreground">No properties yet</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Add your first property to start managing tenants
+                  Add your first HMO property to start managing rooms and tenants
                 </p>
-                <Button className="mt-6" onClick={() => setShowAddModal(true)}>
-                  <Plus className="mr-2 size-4" />
-                  Add Property
+                <Button className="mt-6" asChild>
+                  <Link href="/dashboard/properties/new">
+                    <Plus className="mr-2 size-4" />
+                    Add Property
+                  </Link>
                 </Button>
               </div>
             )
@@ -164,7 +116,10 @@ export default function PropertiesPage() {
                     className="group rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-md"
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                      <Link
+                        href={`/dashboard/properties/${property.id}`}
+                        className="flex items-center gap-3"
+                      >
                         <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
                           <Home className="size-5" />
                         </div>
@@ -173,19 +128,21 @@ export default function PropertiesPage() {
                           {property.address && (
                             <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
                               <MapPin className="size-3" />
-                              {property.address}
+                              <span className="max-w-[180px] truncate">{property.address}</span>
                             </p>
                           )}
                         </div>
-                      </div>
+                      </Link>
                       <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                         <Button
                           variant="ghost"
                           size="icon"
                           className="size-8"
-                          onClick={() => openEditModal(property)}
+                          asChild
                         >
-                          <Pencil className="size-4" />
+                          <Link href={`/dashboard/properties/${property.id}/edit`}>
+                            <Pencil className="size-4" />
+                          </Link>
                         </Button>
                         <Button
                           variant="ghost"
@@ -198,98 +155,51 @@ export default function PropertiesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex gap-4 text-sm">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                    {/* Property Type & Status */}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {property.propertyType && (
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700">
+                          {propertyTypeLabels[property.propertyType] || property.propertyType}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="secondary"
+                        className={property.status === 'available' ? 'bg-green-50 text-green-700' : 'bg-violet-50 text-violet-700'}
+                      >
+                        {property.status === 'available' ? 'Available' : 'Occupied'}
+                      </Badge>
+                      {property.epcRating && (
+                        <Badge variant="secondary" className="bg-amber-50 text-amber-700">
+                          EPC {property.epcRating}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Stats Row */}
+                    <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
                         <Building2 className="size-4" />
                         {property.totalRooms}
                         {' '}
-                        room
-                        {property.totalRooms !== 1 ? 's' : ''}
+                        room{property.totalRooms !== 1 ? 's' : ''}
                       </div>
-                      <div className={`flex items-center gap-1.5 ${property.status === 'available' ? 'text-green-600' : 'text-blue-600'}`}>
-                        <span className={`size-2 rounded-full ${property.status === 'available' ? 'bg-green-500' : 'bg-blue-500'}`} />
-                        {property.status === 'available' ? 'Available' : 'Occupied'}
+                      <div className="font-medium text-foreground">
+                        {formatCurrency(property.monthlyRent)}/mo
                       </div>
+                    </div>
+
+                    {/* Features */}
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      {property.furnished === 1 && <span>Furnished</span>}
+                      {property.wifiIncluded === 1 && <span>· WiFi</span>}
+                      {property.billsIncluded === 1 && <span>· Bills inc.</span>}
+                      {property.hasParking === 1 && <span>· Parking</span>}
+                      {property.hasGarden === 1 && <span>· Garden</span>}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-
-      {/* Add Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Property</DialogTitle>
-            <DialogDescription>
-              Add a new rental property to your portfolio
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Property Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., 123 Oak Street"
-                value={formName}
-                onChange={e => setFormName(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="address">Address *</Label>
-              <Input
-                id="address"
-                placeholder="Full address"
-                value={formAddress}
-                onChange={e => setFormAddress(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAdd} disabled={!formName.trim() || !formAddress.trim() || formLoading}>
-              {formLoading ? 'Adding...' : 'Add Property'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Modal */}
-      <Dialog open={!!editingProperty} onOpenChange={() => setEditingProperty(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Property</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">Property Name *</Label>
-              <Input
-                id="edit-name"
-                value={formName}
-                onChange={e => setFormName(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-address">Address *</Label>
-              <Input
-                id="edit-address"
-                value={formAddress}
-                onChange={e => setFormAddress(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingProperty(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEdit} disabled={!formName.trim() || !formAddress.trim() || formLoading}>
-              {formLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation */}
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
@@ -299,15 +209,15 @@ export default function PropertiesPage() {
             <DialogDescription>
               Are you sure you want to delete &quot;
               {deleteConfirm?.name}
-              &quot;? This will also remove all associated tenants and issues.
+              &quot;? This will also remove all associated rooms, tenants and issues.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={formLoading}>
-              {formLoading ? 'Deleting...' : 'Delete Property'}
+            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              {isPending ? 'Deleting...' : 'Delete Property'}
             </Button>
           </DialogFooter>
         </DialogContent>
