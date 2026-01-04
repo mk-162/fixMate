@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/mk-162/fixMate/compare/v1.13.0...v1.14.0) (2026-01-04)
+
+
+### Features
+
+* add agent prompts section to guide page ([4c224a7](https://github.com/mk-162/fixMate/commit/4c224a7deb63a2b9dfa945b6138c0bbfc1699eb3))
+
 # [1.13.0](https://github.com/mk-162/fixMate/compare/v1.12.4...v1.13.0) (2026-01-04)
 
 
