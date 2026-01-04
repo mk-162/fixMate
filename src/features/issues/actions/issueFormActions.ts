@@ -138,8 +138,12 @@ export async function getContractorsForSelect(category?: string): Promise<Contra
     return contractors.sort((a, b) => {
       const aMatches = matchingTrades.includes(a.trade);
       const bMatches = matchingTrades.includes(b.trade);
-      if (aMatches && !bMatches) return -1;
-      if (!aMatches && bMatches) return 1;
+      if (aMatches && !bMatches) {
+        return -1;
+      }
+      if (!aMatches && bMatches) {
+        return 1;
+      }
       return 0;
     });
   }
