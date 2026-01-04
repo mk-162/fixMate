@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   index,
   integer,
   pgEnum,
@@ -271,7 +272,7 @@ export const tenantsSchema = pgTable(
     propertyId: integer('property_id').references(() => propertiesSchema.id), // Kept for backwards compatibility
     // Basic info
     name: text('name').notNull(),
-    email: text('email').notNull(),
+    email: text('email'), // Nullable - not all tenants have email initially
     phone: text('phone'),
     // Lease details
     leaseStart: timestamp('lease_start', { mode: 'date' }),
@@ -294,7 +295,7 @@ export const tenantsSchema = pgTable(
     course: text('course'),
     yearOfStudy: integer('year_of_study'),
     // Status
-    isActive: integer('is_active').default(1),
+    isActive: boolean('is_active').default(true),
     notes: text('notes'),
     updatedAt: timestamp('updated_at', { mode: 'date' })
       .defaultNow()

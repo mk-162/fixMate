@@ -5,7 +5,7 @@ export const depositSchemeOptions = ['DPS', 'TDS', 'MyDeposits'] as const;
 export const tenantFormSchema = z.object({
   // Basic info
   name: z.string().min(1, 'Name is required').max(256),
-  email: z.string().email('Invalid email').max(256),
+  email: z.string().email('Invalid email').max(256).optional().or(z.literal('')).nullable(),
   phone: z.string().max(50).optional().nullable(),
 
   // Room & Property assignment

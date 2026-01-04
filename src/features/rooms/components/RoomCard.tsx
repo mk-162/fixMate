@@ -19,7 +19,7 @@ type RoomCardProps = {
     tenant: {
       id: number;
       name: string;
-      email: string;
+      email: string | null;
       leaseEnd: Date | null;
     } | null;
   };
