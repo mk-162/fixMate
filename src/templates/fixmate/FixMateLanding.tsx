@@ -45,14 +45,20 @@ const Navigation = () => {
 
         {/* Desktop Nav */}
         <div className="hidden items-center gap-8 md:flex">
-          <a href="#problem" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            The Problem
+          <a href="/features" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Features
           </a>
-          <a href="#how-it-works" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            How It Works
+          <a href="/faq" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            FAQ
           </a>
-          <a href="#safety" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            Safety
+          <a href="/guide" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Guide
+          </a>
+          <a href="/wishlist" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Roadmap
+          </a>
+          <a href="/plans" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Plans
           </a>
           <a
             href="/sign-in"
@@ -93,9 +99,11 @@ const Navigation = () => {
       {mobileMenuOpen && (
         <div className="glass border-t border-border/50 md:hidden">
           <div className="flex flex-col gap-4 p-6">
-            <a href="#problem" className="text-sm font-medium text-muted-foreground">The Problem</a>
-            <a href="#how-it-works" className="text-sm font-medium text-muted-foreground">How It Works</a>
-            <a href="#safety" className="text-sm font-medium text-muted-foreground">Safety</a>
+            <a href="/features" className="text-sm font-medium text-muted-foreground">Features</a>
+            <a href="/faq" className="text-sm font-medium text-muted-foreground">FAQ</a>
+            <a href="/guide" className="text-sm font-medium text-muted-foreground">Guide</a>
+            <a href="/wishlist" className="text-sm font-medium text-muted-foreground">Roadmap</a>
+            <a href="/plans" className="text-sm font-medium text-muted-foreground">Plans</a>
             <a href="/sign-in" className="text-sm font-medium text-muted-foreground">Sign In</a>
             <a href="/sign-up" className="text-sm font-medium text-primary">Sign Up</a>
             <a
@@ -593,10 +601,12 @@ const FooterSection = () => (
     <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 md:flex-row">
       <FixMateLogo />
 
-      <div className="flex items-center gap-6">
-        <span className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">Privacy</span>
-        <span className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">Terms</span>
-        <span className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">Contact</span>
+      <div className="flex flex-wrap items-center justify-center gap-6">
+        <a href="/features" className="text-sm text-muted-foreground hover:text-foreground">Features</a>
+        <a href="/faq" className="text-sm text-muted-foreground hover:text-foreground">FAQ</a>
+        <a href="/guide" className="text-sm text-muted-foreground hover:text-foreground">Guide</a>
+        <a href="/wishlist" className="text-sm text-muted-foreground hover:text-foreground">Roadmap</a>
+        <a href="/plans" className="text-sm text-muted-foreground hover:text-foreground">Plans</a>
       </div>
 
       <p className="text-sm text-muted-foreground">

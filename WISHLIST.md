@@ -83,4 +83,4 @@ Features prioritized for future development. Tier 1 has been implemented.
 
 ---
 
-*Last updated: 2026-01-03*
+*Last updated: 2026-01-04*
