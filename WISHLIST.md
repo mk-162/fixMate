@@ -44,6 +44,10 @@ Features prioritized for future development. Tier 1 has been implemented.
 - [ ] **Agent performance analytics** - Resolution rate, escalation rate, avg turns to resolve
 - [ ] **Custom troubleshooting guides** - Per property/appliance type configurations
 - [ ] **Multi-agent support** - Different specialized agents for HVAC, plumbing, electrical
+- [ ] **Photo analysis** - Agent analyzes uploaded photos of issues to better diagnose problems
+- [ ] **Auto-assign contractors** - Agent automatically suggests/assigns contractors based on issue category
+- [ ] **Direct notifications** - Agent sends notifications directly (not just `would_notify` placeholder)
+- [ ] **Property/room context** - Agent accesses full property and room details for smarter responses
 
 ## Tenant Experience
 - [ ] **Photo/video upload** - Allow tenants to attach media to issues
@@ -60,6 +64,12 @@ Features prioritized for future development. Tier 1 has been implemented.
 - [ ] **Property management systems** - Buildium, AppFolio, Yardi integrations
 - [ ] **Payment/invoicing** - Repair cost tracking and billing
 - [ ] **SMS notifications** - Twilio integration for text alerts
+- [ ] **Accounting integration** - Xero, QuickBooks for invoice/quote tracking
+
+## Infrastructure Decisions (TBD)
+- [ ] **File storage provider** - Choose S3, Cloudflare R2, or Vercel Blob for photo/document uploads
+- [ ] **Email provider** - Choose Resend, SendGrid, or Postmark for notifications
+- [ ] **Cost tracking scope** - Manual PDF upload vs. line-item breakdown in database
 
 ## Security & Authentication
 - [ ] **WhatsApp tenant verification** - Prevent fraud where anyone can claim to be a tenant

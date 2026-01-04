@@ -190,8 +190,10 @@ export async function getPropertyWithDetails(id: number) {
       name: tenantsSchema.name,
       email: tenantsSchema.email,
       phone: tenantsSchema.phone,
-      roomNumber: tenantsSchema.roomNumber,
-      moveInDate: tenantsSchema.moveInDate,
+      roomId: tenantsSchema.roomId,
+      leaseStart: tenantsSchema.leaseStart,
+      leaseEnd: tenantsSchema.leaseEnd,
+      university: tenantsSchema.university,
     })
     .from(tenantsSchema)
     .where(eq(tenantsSchema.propertyId, id));

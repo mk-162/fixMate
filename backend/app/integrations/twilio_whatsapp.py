@@ -1,8 +1,12 @@
 """Twilio WhatsApp client for sandbox testing."""
 import os
+from dotenv import load_dotenv
 from twilio.rest import Client
 from twilio.request_validator import RequestValidator
 from typing import Optional
+
+# Load .env before reading environment variables
+load_dotenv()
 
 
 class TwilioWhatsAppClient:

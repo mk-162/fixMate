@@ -196,11 +196,9 @@ export default async function PropertyDetailPage(props: Props) {
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="font-medium text-foreground">{tenant.name}</p>
-                          {tenant.roomNumber && (
+                          {tenant.university && (
                             <p className="mt-0.5 text-sm text-muted-foreground">
-                              Room
-                              {' '}
-                              {tenant.roomNumber}
+                              {tenant.university}
                             </p>
                           )}
                         </div>

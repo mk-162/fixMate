@@ -62,6 +62,12 @@ export default function PropertiesPage() {
         totalRooms: 1,
         monthlyRent: 0,
         status: 'available',
+        propertyType: 'hmo',
+        furnished: 1,
+        hasParking: 0,
+        hasGarden: 0,
+        wifiIncluded: 0,
+        billsIncluded: 0,
       });
       setShowAddModal(false);
       setFormName('');

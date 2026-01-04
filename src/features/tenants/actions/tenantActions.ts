@@ -21,8 +21,19 @@ export type TenantWithDetails = {
     name: string;
     email: string | null;
     phone: string | null;
-    roomNumber: string | null;
-    moveInDate: Date | null;
+    roomId: number | null;
+    leaseStart: Date | null;
+    leaseEnd: Date | null;
+    rentAmount: number | null;
+    depositAmount: number | null;
+    university: string | null;
+    course: string | null;
+    yearOfStudy: number | null;
+    emergencyContactName: string | null;
+    emergencyContactPhone: string | null;
+    guarantorName: string | null;
+    guarantorPhone: string | null;
+    notes: string | null;
     createdAt: Date;
   };
   property: {
@@ -66,8 +77,19 @@ export async function getTenantWithDetails(id: number): Promise<TenantWithDetail
       name: tenantsSchema.name,
       email: tenantsSchema.email,
       phone: tenantsSchema.phone,
-      roomNumber: tenantsSchema.roomNumber,
-      moveInDate: tenantsSchema.moveInDate,
+      roomId: tenantsSchema.roomId,
+      leaseStart: tenantsSchema.leaseStart,
+      leaseEnd: tenantsSchema.leaseEnd,
+      rentAmount: tenantsSchema.rentAmount,
+      depositAmount: tenantsSchema.depositAmount,
+      university: tenantsSchema.university,
+      course: tenantsSchema.course,
+      yearOfStudy: tenantsSchema.yearOfStudy,
+      emergencyContactName: tenantsSchema.emergencyContactName,
+      emergencyContactPhone: tenantsSchema.emergencyContactPhone,
+      guarantorName: tenantsSchema.guarantorName,
+      guarantorPhone: tenantsSchema.guarantorPhone,
+      notes: tenantsSchema.notes,
       createdAt: tenantsSchema.createdAt,
       propertyId: tenantsSchema.propertyId,
     })
@@ -133,8 +155,19 @@ export async function getTenantWithDetails(id: number): Promise<TenantWithDetail
       name: tenant.name,
       email: tenant.email,
       phone: tenant.phone,
-      roomNumber: tenant.roomNumber,
-      moveInDate: tenant.moveInDate,
+      roomId: tenant.roomId,
+      leaseStart: tenant.leaseStart,
+      leaseEnd: tenant.leaseEnd,
+      rentAmount: tenant.rentAmount,
+      depositAmount: tenant.depositAmount,
+      university: tenant.university,
+      course: tenant.course,
+      yearOfStudy: tenant.yearOfStudy,
+      emergencyContactName: tenant.emergencyContactName,
+      emergencyContactPhone: tenant.emergencyContactPhone,
+      guarantorName: tenant.guarantorName,
+      guarantorPhone: tenant.guarantorPhone,
+      notes: tenant.notes,
       createdAt: tenant.createdAt,
     },
     property,

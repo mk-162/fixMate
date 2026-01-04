@@ -4,8 +4,25 @@ import { z } from 'zod';
 export const propertyStatusOptions = ['available', 'occupied'] as const;
 export type PropertyStatus = (typeof propertyStatusOptions)[number];
 
+// Property type options
+export const propertyTypeOptions = ['hmo', 'single_let', 'studio'] as const;
+export type PropertyType = (typeof propertyTypeOptions)[number];
+
+// EPC rating options
+export const epcRatingOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const;
+export type EpcRating = (typeof epcRatingOptions)[number];
+
+// Council tax band options
+export const councilTaxBandOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+export type CouncilTaxBand = (typeof councilTaxBandOptions)[number];
+
+// Heating type options
+export const heatingTypeOptions = ['gas', 'electric', 'oil', 'heat_pump', 'other'] as const;
+export type HeatingType = (typeof heatingTypeOptions)[number];
+
 // Base schema for property form validation
 export const propertyFormSchema = z.object({
+  // Basic Info
   name: z
     .string()
     .min(1, 'Property name is required')
@@ -15,6 +32,8 @@ export const propertyFormSchema = z.object({
     .string()
     .min(1, 'Address is required')
     .max(512, 'Address must be less than 512 characters'),
+
+  propertyType: z.enum(propertyTypeOptions).default('hmo'),
 
   totalRooms: z.coerce
     .number()
@@ -32,6 +51,39 @@ export const propertyFormSchema = z.object({
     errorMap: () => ({ message: 'Please select a valid status' }),
   }),
 
+  // Compliance & Certificates
+  licenseNumber: z
+    .string()
+    .max(100, 'License number must be less than 100 characters')
+    .optional()
+    .or(z.literal('')),
+
+  licenseExpiry: z.coerce.date().optional().nullable(),
+
+  epcRating: z.enum(epcRatingOptions).optional().nullable(),
+
+  epcExpiry: z.coerce.date().optional().nullable(),
+
+  gasCertExpiry: z.coerce.date().optional().nullable(),
+
+  electricalCertExpiry: z.coerce.date().optional().nullable(),
+
+  councilTaxBand: z.enum(councilTaxBandOptions).optional().nullable(),
+
+  // Property Features
+  heatingType: z.enum(heatingTypeOptions).optional().nullable(),
+
+  furnished: z.coerce.number().min(0).max(1).default(1),
+
+  hasParking: z.coerce.number().min(0).max(1).default(0),
+
+  hasGarden: z.coerce.number().min(0).max(1).default(0),
+
+  wifiIncluded: z.coerce.number().min(0).max(1).default(0),
+
+  billsIncluded: z.coerce.number().min(0).max(1).default(0),
+
+  // Other
   notes: z
     .string()
     .max(2000, 'Notes must be less than 2000 characters')
@@ -60,6 +112,7 @@ export const updatePropertySchema = propertyFormSchema.partial();
 // Schema for filtering/querying
 export const propertyFilterSchema = z.object({
   status: z.enum(propertyStatusOptions).optional(),
+  propertyType: z.enum(propertyTypeOptions).optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),

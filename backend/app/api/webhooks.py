@@ -661,18 +661,44 @@ async def twilio_webhook(
     body = form_data.get("Body", "")
     message_sid = form_data.get("MessageSid", "")
 
+    print(f"[TWILIO WEBHOOK] Received message from {from_number}: {body[:50]}...")
+    print(f"[TWILIO WEBHOOK] Twilio configured: {twilio_client.is_configured()}")
+
     # Only process if we have a message
     if from_number and body:
         # Process in background to respond quickly
         background_tasks.add_task(
-            process_twilio_message,
+            process_twilio_message_with_logging,
             from_number,
             body,
             message_sid,
         )
+    else:
+        print(f"[TWILIO WEBHOOK] No message to process (from={from_number}, body={body})")
 
     # Return empty TwiML response (acknowledges receipt, no auto-reply)
     return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+
+
+async def process_twilio_message_with_logging(from_number: str, body: str, message_sid: str):
+    """Wrapper to catch and log all errors in background task."""
+    try:
+        print(f"[BACKGROUND] Starting to process message from {from_number}")
+        await process_twilio_message(from_number, body, message_sid)
+        print(f"[BACKGROUND] Finished processing message from {from_number}")
+    except Exception as e:
+        print(f"[BACKGROUND ERROR] Failed to process message: {e}")
+        import traceback
+        traceback.print_exc()
+        # Try to send error message to user
+        try:
+            phone = parse_twilio_phone(from_number)
+            await twilio_client.send_message(
+                phone,
+                "Sorry, something went wrong. Please try again or contact your property manager."
+            )
+        except Exception as send_error:
+            print(f"[BACKGROUND ERROR] Also failed to send error message: {send_error}")
 
 
 @router.get("/webhooks/twilio")

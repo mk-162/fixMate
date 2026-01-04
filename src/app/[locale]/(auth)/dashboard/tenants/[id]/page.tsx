@@ -1,10 +1,13 @@
 import {
   ArrowLeft,
+  BookOpen,
   Building2,
   Calendar,
   ClipboardList,
+  GraduationCap,
   Mail,
   Phone,
+  Shield,
   User,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -35,6 +38,24 @@ const priorityColors: Record<string, string> = {
   high: 'bg-orange-100 text-orange-700',
   urgent: 'bg-red-100 text-red-700',
 };
+
+function formatDate(date: Date | null): string {
+  if (!date) {
+    return 'Not set';
+  }
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatCurrency(amount: number | null): string {
+  if (amount === null) {
+    return 'Not set';
+  }
+  return `£${amount.toLocaleString()}`;
+}
 
 export async function generateMetadata(props: Props) {
   const { id } = await props.params;
@@ -102,9 +123,8 @@ export default async function TenantDetailPage(props: Props) {
         </div>
       </div>
 
-      {/* Contact & Info Section */}
+      {/* Contact Info */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Phone */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-blue-100 p-2 text-blue-600">
@@ -119,7 +139,6 @@ export default async function TenantDetailPage(props: Props) {
           </div>
         </div>
 
-        {/* Email */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-violet-100 p-2 text-violet-600">
@@ -134,42 +153,126 @@ export default async function TenantDetailPage(props: Props) {
           </div>
         </div>
 
-        {/* Room */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-amber-100 p-2 text-amber-600">
-              <Building2 className="size-5" />
+              <Calendar className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Room</p>
+              <p className="text-sm text-muted-foreground">Lease Start</p>
               <p className="truncate font-medium">
-                {tenant.roomNumber || 'Not assigned'}
+                {formatDate(tenant.leaseStart)}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Move In Date */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600">
+            <div className="rounded-lg bg-red-100 p-2 text-red-600">
               <Calendar className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Move-in Date</p>
+              <p className="text-sm text-muted-foreground">Lease End</p>
               <p className="truncate font-medium">
-                {tenant.moveInDate
-                  ? new Date(tenant.moveInDate).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                  : 'Not set'}
+                {formatDate(tenant.leaseEnd)}
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Student Info & Financial */}
+      <div className="mb-8 grid gap-6 lg:grid-cols-2">
+        {/* Student Info */}
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h3 className="mb-4 flex items-center gap-2 font-semibold">
+            <GraduationCap className="size-5 text-blue-600" />
+            Student Information
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">University</span>
+              <span className="font-medium">{tenant.university || 'Not set'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Course</span>
+              <span className="font-medium">{tenant.course || 'Not set'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Year of Study</span>
+              <span className="font-medium">
+                {tenant.yearOfStudy ? `Year ${tenant.yearOfStudy}` : 'Not set'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Financial */}
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h3 className="mb-4 flex items-center gap-2 font-semibold">
+            <BookOpen className="size-5 text-emerald-600" />
+            Tenancy Details
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Monthly Rent</span>
+              <span className="font-medium">{formatCurrency(tenant.rentAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Deposit</span>
+              <span className="font-medium">{formatCurrency(tenant.depositAmount)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Emergency & Guarantor */}
+      <div className="mb-8 grid gap-6 lg:grid-cols-2">
+        {/* Emergency Contact */}
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h3 className="mb-4 flex items-center gap-2 font-semibold">
+            <Phone className="size-5 text-red-600" />
+            Emergency Contact
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Name</span>
+              <span className="font-medium">{tenant.emergencyContactName || 'Not set'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Phone</span>
+              <span className="font-medium">{tenant.emergencyContactPhone || 'Not set'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Guarantor */}
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h3 className="mb-4 flex items-center gap-2 font-semibold">
+            <Shield className="size-5 text-purple-600" />
+            Guarantor
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Name</span>
+              <span className="font-medium">{tenant.guarantorName || 'Not set'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Phone</span>
+              <span className="font-medium">{tenant.guarantorPhone || 'Not set'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Notes */}
+      {tenant.notes && (
+        <div className="mb-8 rounded-xl border border-border bg-card p-6">
+          <h3 className="mb-3 font-semibold">Notes</h3>
+          <p className="whitespace-pre-wrap text-muted-foreground">{tenant.notes}</p>
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
@@ -241,11 +344,7 @@ export default async function TenantDetailPage(props: Props) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-foreground">{issue.title}</p>
                         <p className="mt-0.5 text-sm text-muted-foreground">
-                          {new Date(issue.createdAt).toLocaleDateString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
+                          {formatDate(issue.createdAt)}
                           {issue.category && ` · ${issue.category}`}
                         </p>
                       </div>
