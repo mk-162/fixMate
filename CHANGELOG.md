@@ -1,3 +1,15 @@
+# [1.10.0](https://github.com/mk-162/fixMate/compare/v1.9.1...v1.10.0) (2026-01-04)
+
+
+### Bug Fixes
+
+* add stdout flush for Railway logging ([ef0a809](https://github.com/mk-162/fixMate/commit/ef0a809237b692c290aa316767d9f7c4619ae01a))
+
+
+### Features
+
+* enhance properties list with full property details ([b3446ba](https://github.com/mk-162/fixMate/commit/b3446babb3edbd64aabe5c50fc9201def216d653))
+
 ## [1.9.1](https://github.com/mk-162/fixMate/compare/v1.9.0...v1.9.1) (2026-01-04)
 
 
