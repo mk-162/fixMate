@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/mk-162/fixMate/compare/v1.14.5...v1.15.0) (2026-01-04)
+
+
+### Features
+
+* add team issue creation form with property/tenant selection ([e17e0bd](https://github.com/mk-162/fixMate/commit/e17e0bdbdbc0119bd4c243d56696351380fe512b))
+
 ## [1.14.5](https://github.com/mk-162/fixMate/compare/v1.14.4...v1.14.5) (2026-01-04)
 
 
