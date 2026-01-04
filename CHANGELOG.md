@@ -1,3 +1,10 @@
+## [1.14.3](https://github.com/mk-162/fixMate/compare/v1.14.2...v1.14.3) (2026-01-04)
+
+
+### Bug Fixes
+
+* remove unused desc import ([356c705](https://github.com/mk-162/fixMate/commit/356c705299a8ec11794bc1d37cfd0aef6c50f5a7))
+
 ## [1.14.2](https://github.com/mk-162/fixMate/compare/v1.14.1...v1.14.2) (2026-01-04)
 
 
