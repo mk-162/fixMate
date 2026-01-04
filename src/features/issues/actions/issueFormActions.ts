@@ -116,7 +116,7 @@ export async function getContractorsForSelect(category?: string): Promise<Contra
 
   const conditions = [
     eq(contractorsSchema.organizationId, ownerId),
-    eq(contractorsSchema.isActive, true),
+    eq(contractorsSchema.isActive, 1),
   ];
 
   const contractors = await db
