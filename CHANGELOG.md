@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/mk-162/fixMate/compare/v1.9.0...v1.9.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* cors config and room actions db connection ([fd61a9f](https://github.com/mk-162/fixMate/commit/fd61a9f8156ed8389058d94d06d0c464db1d5742))
+
 # [1.9.0](https://github.com/mk-162/fixMate/compare/v1.8.0...v1.9.0) (2026-01-04)
 
 
