@@ -194,7 +194,7 @@ async def send_agent_response_to_whatsapp(issue_id: int, contact_id: str):
     Get the latest agent message and send it to WhatsApp.
     """
     # Get recent messages
-    recent_messages = await messages.get_messages(issue_id, limit=5)
+    recent_messages = await messages.get_messages(issue_id)
 
     # Find the most recent agent message
     for msg in reversed(recent_messages):
@@ -599,7 +599,7 @@ async def send_twilio_agent_response(issue_id: int, phone: str):
     Get the latest agent message and send it via Twilio WhatsApp.
     """
     # Get recent messages
-    recent_messages = await messages.get_messages(issue_id, limit=5)
+    recent_messages = await messages.get_messages(issue_id)
 
     # Find the most recent agent message
     for msg in reversed(recent_messages):

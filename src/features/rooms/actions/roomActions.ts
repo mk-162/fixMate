@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
-import { db } from '@/libs/DB';
+import { getDb } from '@/libs/DB';
 import { propertiesSchema, type Room, roomsSchema, tenantsSchema } from '@/models/Schema';
 
 import type { RoomFormValues } from '../schemas/roomSchema';
@@ -15,6 +15,8 @@ export async function getRooms(propertyId: number): Promise<Room[]> {
   if (!orgId) {
     throw new Error('Unauthorized');
   }
+
+  const db = await getDb();
 
   // Verify the property belongs to this org
   const property = await db
@@ -45,6 +47,8 @@ export async function getRoomWithTenant(roomId: number) {
   if (!orgId) {
     throw new Error('Unauthorized');
   }
+
+  const db = await getDb();
 
   const room = await db
     .select()
@@ -97,6 +101,8 @@ export async function createRoom(propertyId: number, data: RoomFormValues): Prom
     throw new Error('Unauthorized');
   }
 
+  const db = await getDb();
+
   // Verify property belongs to org
   const property = await db
     .select()
@@ -138,6 +144,8 @@ export async function updateRoom(roomId: number, data: Partial<RoomFormValues>):
   if (!orgId) {
     throw new Error('Unauthorized');
   }
+
+  const db = await getDb();
 
   // Get the room first
   const room = await db
@@ -212,6 +220,8 @@ export async function deleteRoom(roomId: number): Promise<void> {
     throw new Error('Unauthorized');
   }
 
+  const db = await getDb();
+
   // Get the room first
   const room = await db
     .select()
@@ -261,6 +271,8 @@ export async function getRoomsWithTenants(propertyId: number) {
   if (!orgId) {
     throw new Error('Unauthorized');
   }
+
+  const db = await getDb();
 
   // Verify property belongs to org
   const property = await db

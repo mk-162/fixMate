@@ -17,10 +17,16 @@ app = FastAPI(
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for dev
+    allow_origins=[
+        "http://localhost:3000",
+        "https://fix-mate-seven.vercel.app",
+        "https://fixmate.vercel.app",
+        "*",  # Fallback for other origins
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include API routes
