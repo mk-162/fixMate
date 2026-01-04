@@ -139,18 +139,31 @@ backend/
 ```
 src/
 ├── app/[locale]/(auth)/dashboard/
-│   ├── properties/          # Uses Server Actions (fixed!)
-│   ├── tenants/             # Uses Railway API (for WhatsApp)
-│   └── ...
-├── features/
+│   ├── page.tsx             # Enhanced dashboard with portfolio stats
 │   ├── properties/
-│   │   ├── actions/         # Server Actions (createProperty, etc.)
+│   │   └── [id]/page.tsx    # Property detail with tenants & issues
+│   ├── tenants/
+│   │   └── [id]/page.tsx    # Tenant detail with issue history
+│   ├── issues/
+│   │   └── [id]/page.tsx    # Issue detail with PM notes
+│   ├── pm-dashboard/        # Issue queue with quick status updates
+│   └── demo/                # Investor demo page
+├── features/
+│   ├── dashboard/
+│   │   └── actions/         # getDashboardStats, getPropertiesWithStats
+│   ├── properties/
+│   │   ├── actions/         # Server Actions (createProperty, getPropertyWithDetails)
 │   │   ├── components/      # PropertyForm, PropertyTable
 │   │   └── schemas/         # Zod validation
+│   ├── tenants/
+│   │   └── actions/         # getTenantWithDetails
+│   ├── pm-dashboard/
+│   │   ├── components/      # PMIssueCard, PMIssueQueue, CategoryBadge
+│   │   └── constants.ts     # statusConfig, categoryConfig
 │   └── ...
 ├── libs/
 │   ├── DB.ts                # Drizzle database client
-│   └── FixmateAPI.ts        # Railway API client
+│   └── FixmateAPI.ts        # Railway API client (issues, tenants, analytics)
 └── models/
     └── Schema.ts            # Drizzle schema definitions
 ```
@@ -200,6 +213,8 @@ GET    /api/issues/{id}/messages   # Get conversation
 GET    /api/issues/{id}/activity   # Get activity log
 POST   /api/issues/{id}/assign     # Assign tradesperson
 POST   /api/issues/{id}/close      # Close issue
+PUT    /api/issues/{id}/status     # Update issue status
+PUT    /api/issues/{id}/notes      # Update PM internal notes
 ```
 
 #### Tenants (for WhatsApp)
@@ -317,11 +332,17 @@ python migrate_add_org_id.py
 | File | Purpose |
 |------|---------|
 | `backend/app/agents/triage_agent.py` | Core AI agent logic (Claude Agent SDK) |
-| `backend/app/api/routes.py` | Issues API + Analytics endpoints |
+| `backend/app/api/routes.py` | Issues API + Analytics + Status/Notes endpoints |
 | `backend/app/api/webhooks.py` | WhatsApp webhook handlers |
 | `backend/app/db/*.py` | Database operations |
+| `backend/migrate_add_pm_notes.py` | Migration for PM notes column |
+| `src/app/[locale]/(auth)/dashboard/page.tsx` | Enhanced dashboard with portfolio stats |
+| `src/features/dashboard/actions/dashboardActions.ts` | Dashboard statistics Server Actions |
 | `src/features/properties/actions/propertyActions.ts` | Property Server Actions |
-| `src/libs/FixmateAPI.ts` | Railway API client (for tenants/issues) |
+| `src/features/tenants/actions/tenantActions.ts` | Tenant detail Server Actions |
+| `src/features/pm-dashboard/components/CategoryBadge.tsx` | Issue category icons component |
+| `src/features/pm-dashboard/constants.ts` | Status and category configurations |
+| `src/libs/FixmateAPI.ts` | Railway API client (issues, analytics) |
 | `src/models/Schema.ts` | Drizzle schema definitions |
 
 ---
@@ -414,3 +435,103 @@ Use `/api/demo/simulate-issue?scenario=X` to create test issues:
 - **Total Savings**: £150 × resolved issues
 - **Response Time**: Typically < 30 seconds
 - **Emergency Detection**: Instant escalation for safety issues
+
+---
+
+## Dashboard Features
+
+### Portfolio Overview (Dashboard Home)
+
+The main dashboard displays key portfolio metrics at a glance:
+
+| Metric | Description |
+|--------|-------------|
+| **Properties** | Total properties in portfolio |
+| **Tenants** | Total active tenants |
+| **Occupancy Rate** | % of rooms occupied |
+| **Monthly Rent** | Total expected monthly income |
+| **Active Issues** | Open maintenance issues |
+| **AI Resolution Rate** | % of issues resolved by AI |
+
+### Property Management
+
+**Property List** (`/dashboard/properties`)
+- View all properties with tenant count and active issues
+- Quick stats: rooms, rent, occupancy status
+
+**Property Detail** (`/dashboard/properties/[id]`)
+- Property stats row: rooms, tenants, monthly rent, active issues
+- Tenants section: list of all tenants with contact info
+- Issues section: all maintenance issues for this property
+- Quick navigation to tenant and issue detail pages
+
+### Tenant Management
+
+**Tenant List** (`/dashboard/tenants`)
+- View all tenants with property assignment
+- Contact information and status
+
+**Tenant Detail** (`/dashboard/tenants/[id]`)
+- Contact information (email, phone)
+- Property assignment with link
+- Stats: total issues, active issues, resolved issues
+- Complete issue history
+
+### Issue Management
+
+**PM Dashboard** (`/dashboard/pm-dashboard`)
+- Issue queue with filtering by status
+- Category badges with visual icons:
+  - 🔧 Plumbing (blue)
+  - 💡 Electrical (yellow)
+  - 🧊 Appliance (purple)
+  - 🔥 Heating (orange)
+  - ❄️ HVAC (cyan)
+  - 🔨 Structural (gray)
+  - 🐛 Pest (red)
+  - ✨ Cleaning (green)
+  - 🔒 Security (slate)
+  - 🌳 Exterior (emerald)
+- **Quick Status Updates**: Dropdown to change issue status directly from cards
+- Priority and assigned tradesperson display
+
+**Issue Detail** (`/dashboard/issues/[id]`)
+- Full conversation thread with tenant
+- Issue status card with:
+  - Current status badge
+  - Priority level
+  - Category
+  - Assigned tradesperson
+  - Resolution message (if resolved)
+- **Internal Notes**: Private notes field for property managers (not visible to tenants)
+- Agent Activity log (collapsible)
+- Reply form for ongoing conversations
+
+### Issue Statuses
+
+| Status | Color | Description |
+|--------|-------|-------------|
+| `new` | Blue | Just created |
+| `triaging` | Yellow | AI agent is helping |
+| `resolved_by_agent` | Green | AI resolved without callout |
+| `escalated` | Orange | Needs human attention |
+| `assigned` | Purple | Tradesperson assigned |
+| `in_progress` | Indigo | Work underway |
+| `awaiting_confirmation` | Pink | Waiting for tenant confirmation |
+| `closed` | Gray | Issue completed |
+
+### Issue Categories
+
+| Category | Icon | Common Issues |
+|----------|------|---------------|
+| `plumbing` | Pipette | Leaks, drains, toilets |
+| `electrical` | Lightbulb | Outlets, switches, wiring |
+| `appliance` | Refrigerator | Washing machine, fridge, oven |
+| `heating` | Flame | Boiler, radiators, gas |
+| `hvac` | Thermometer | AC, ventilation |
+| `structural` | Hammer | Walls, floors, doors |
+| `pest` | Bug | Insects, rodents |
+| `cleaning` | Sparkles | Deep clean, mold |
+| `security` | Lock | Locks, alarms, access |
+| `exterior` | Tree | Garden, roof, gutters |
+| `general` | Wrench | Other/uncategorized |
