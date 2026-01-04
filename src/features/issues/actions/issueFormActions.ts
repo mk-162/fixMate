@@ -73,10 +73,9 @@ export async function getTenantsForSelect(propertyId?: number): Promise<TenantOp
     return [];
   }
 
-  // Build conditions
+  // Build conditions - filter to owned properties only
   const conditions = [
     inArray(tenantsSchema.propertyId, ownedPropertyIds),
-    eq(tenantsSchema.isActive, 1),
   ];
 
   // Filter by specific property if provided
@@ -117,7 +116,7 @@ export async function getContractorsForSelect(category?: string): Promise<Contra
 
   const conditions = [
     eq(contractorsSchema.organizationId, ownerId),
-    eq(contractorsSchema.isActive, 1),
+    eq(contractorsSchema.isActive, true),
   ];
 
   const contractors = await db

@@ -312,7 +312,7 @@ export async function getContractorsForCategory(category: string) {
     .where(
       and(
         eq(contractorsSchema.organizationId, organizationId),
-        eq(contractorsSchema.isActive, 1),
+        eq(contractorsSchema.isActive, true),
         or(...trades.map(t => eq(contractorsSchema.trade, t)))!,
       ),
     )
