@@ -159,6 +159,9 @@ class TriageAgent:
                 "resolved_by_agent",
                 resolved_by_agent=tool_input["solution"]
             )
+            # Send confirmation message to tenant
+            confirmation = f"Great news - we've resolved this! {tool_input['solution']} If you have any other issues, just message me anytime."
+            await messages.add_message(issue_id, "agent", confirmation)
             await messages.add_message(
                 issue_id,
                 "system",
@@ -240,19 +243,26 @@ Remember: Your goal is to help resolve issues without unnecessary callouts when 
 
         conversation = await messages.get_conversation_context(issue_id)
 
+        tenant_name = issue.get('tenant_name', 'the tenant')
+        first_name = tenant_name.split()[0] if tenant_name else 'there'
+        property_name = issue.get('property_name', 'their property')
+
         prompt = f"""The tenant has responded to your previous message. Continue helping them.
+
+## Tenant & Property
+- **Tenant**: {tenant_name}
+- **Property**: {property_name} ({issue.get('property_address', 'address not specified')})
 
 ## Issue Details
 - **Title**: {issue['title']}
 - **Description**: {issue['description']}
 - **Status**: {issue['status']}
-- **Issue ID**: {issue_id}
 
 ## Conversation So Far
 {conversation}
 
 ## Your Task
-Based on the tenant's response, continue the troubleshooting process:
+Address {first_name} by name. Based on their response:
 1. If they confirmed something works, move to the next step or mark as resolved
 2. If troubleshooting failed, try alternative approaches or escalate
 3. If they provided new information, incorporate it into your assessment"""

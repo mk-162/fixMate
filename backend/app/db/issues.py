@@ -22,8 +22,18 @@ async def create_issue(
 
 
 async def get_issue(issue_id: int) -> Optional[Dict[str, Any]]:
-    """Get an issue by ID."""
-    query = "SELECT * FROM issues WHERE id = $1"
+    """Get an issue by ID with tenant and property details."""
+    query = """
+        SELECT i.*,
+               t.name as tenant_name,
+               t.email as tenant_email,
+               p.name as property_name,
+               p.address as property_address
+        FROM issues i
+        LEFT JOIN tenants t ON t.id = i.tenant_id
+        LEFT JOIN properties p ON p.id = i.property_id
+        WHERE i.id = $1
+    """
     row = await fetch_one(query, issue_id)
     return dict(row) if row else None
 

@@ -303,6 +303,14 @@ async def process_twilio_message(
     contact_id = phone
     print(f"[PROCESS] Processing message for phone={phone}", flush=True)
 
+    # Check for "new issue" command to force fresh start
+    body_lower = body.lower().strip()
+    if body_lower in ["new issue", "new problem", "start over", "reset"]:
+        print(f"[PROCESS] User requested new issue, skipping active conversation", flush=True)
+        await twilio_client.send_message(phone, "Starting a fresh conversation. What's the issue you need help with?")
+        await handle_new_twilio_issue(phone, "New issue requested via WhatsApp", message_sid)
+        return
+
     # Check if we have an active conversation for this phone
     conversation = await whatsapp_conversations.get_active_conversation(contact_id)
     print(f"[PROCESS] Active conversation: {conversation}", flush=True)
@@ -311,10 +319,6 @@ async def process_twilio_message(
         # Continue existing conversation
         issue_id = conversation["issue_id"]
         print(f"[PROCESS] Continuing conversation for issue {issue_id}", flush=True)
-
-        # QUICK WIN: Send instant acknowledgment
-        ack_result = await twilio_client.send_message(phone, "Got it, let me check on that...")
-        print(f"[PROCESS] Ack send result: {ack_result}", flush=True)
 
         # Record the message
         await messages.add_message(issue_id, "tenant", body)
