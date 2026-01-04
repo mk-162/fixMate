@@ -40,7 +40,7 @@ class WhatsAppConversations:
             JOIN issues i ON i.id = wc.issue_id
             WHERE wc.contact_id = $1
             AND wc.status = 'active'
-            AND i.status NOT IN ('closed', 'resolved_by_agent')
+            AND i.status NOT IN ('closed', 'resolved_by_agent', 'escalated', 'resolved')
             ORDER BY wc.created_at DESC
             LIMIT 1
         """
