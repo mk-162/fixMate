@@ -49,6 +49,13 @@ async def get_issues_by_status(status: str) -> List[Dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+async def get_all_issues(limit: int = 100) -> List[Dict[str, Any]]:
+    """Get all issues, ordered by most recent."""
+    query = "SELECT * FROM issues ORDER BY created_at DESC LIMIT $1"
+    rows = await fetch_all(query, limit)
+    return [dict(row) for row in rows]
+
+
 async def update_issue_status(
     issue_id: int,
     status: str,

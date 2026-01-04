@@ -97,8 +97,8 @@ async def list_issues(
     elif status:
         return await issues.get_issues_by_status(status)
     else:
-        # Return all recent issues (would add pagination in production)
-        return await issues.get_issues_by_status("new")
+        # Return all recent issues
+        return await issues.get_all_issues()
 
 
 @router.post("/issues/{issue_id}/messages")
