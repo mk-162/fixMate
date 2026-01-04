@@ -1,650 +1,182 @@
-"""FixMate Triage Agent - Powered by Claude Agent SDK.
-
-This agent helps tenants troubleshoot maintenance issues before escalating to professionals.
-Features:
-- Emergency detection (gas leaks, flooding, fires)
-- Smart categorization and priority assessment
-- Cost estimation for repairs
-- Multi-turn conversational troubleshooting
-- Sentiment tracking for tenant satisfaction
-- Photo analysis readiness (when images provided)
-"""
-
+"""Issue Triage Agent - helps tenants troubleshoot before escalating."""
 import os
-import asyncio
-from datetime import datetime
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
-from enum import Enum
+import anthropic
+from datetime import datetime, timedelta
+from app.db import issues, messages, activity
 
-from claude_agent_sdk import (
-    ClaudeSDKClient,
-    ClaudeAgentOptions,
-    tool,
-    create_sdk_mcp_server,
-    AssistantMessage,
-    TextBlock,
-    ToolUseBlock,
-    ResultMessage,
-)
+TRIAGE_SYSTEM_PROMPT = """You are FixMate, a helpful property maintenance assistant. Your goal is to help tenants resolve issues themselves when possible, avoiding unnecessary tradesperson callouts.
 
-from app.db import issues, messages, activity, contractors
+## Your Approach
 
+1. **Understand the problem**: Ask clarifying questions to understand exactly what's happening.
+2. **Identify simple fixes**: Many issues have simple solutions (check the manual, ensure it's plugged in, reset the breaker, etc.)
+3. **Guide troubleshooting**: Walk the tenant through basic troubleshooting steps.
+4. **Know when to escalate**: If the issue genuinely requires professional attention, escalate promptly.
 
-class UrgencyLevel(Enum):
-    """Issue urgency levels for smart prioritization."""
-    EMERGENCY = "emergency"  # Gas leak, fire, flooding - immediate action
-    HIGH = "high"           # No heating in winter, broken lock, water damage
-    MEDIUM = "medium"       # Appliance not working, minor leak
-    LOW = "low"             # Cosmetic issues, minor inconveniences
-
-
-@dataclass
-class TenantSentiment:
-    """Track tenant sentiment during conversation."""
-    score: float  # -1.0 to 1.0
-    indicators: List[str]
-
-
-# Emergency keywords that trigger immediate escalation
-EMERGENCY_KEYWORDS = [
-    "gas leak", "smell gas", "gas smell", "burning smell", "smoke", "fire",
-    "flooding", "burst pipe", "water everywhere", "electrical fire",
-    "sparks", "exposed wire", "no heating", "freezing", "carbon monoxide",
-    "break-in", "broken lock", "intruder", "emergency"
-]
-
-# Cost estimation database (for demo purposes)
-REPAIR_COST_ESTIMATES = {
-    "plumbing": {"minor": (50, 150), "moderate": (150, 400), "major": (400, 1500)},
-    "electrical": {"minor": (75, 200), "moderate": (200, 500), "major": (500, 2000)},
-    "appliance": {"minor": (0, 100), "moderate": (100, 300), "major": (300, 800)},
-    "heating": {"minor": (75, 200), "moderate": (200, 600), "major": (600, 2500)},
-    "structural": {"minor": (100, 300), "moderate": (300, 1000), "major": (1000, 5000)},
-}
-
-ENHANCED_SYSTEM_PROMPT = """You are FixMate, an expert AI property maintenance assistant powered by advanced intelligence. Your mission is to help tenants resolve issues quickly and efficiently while saving property managers unnecessary callouts.
-
-## Your Core Capabilities
-
-🚨 **Emergency Detection**: You IMMEDIATELY recognize emergencies (gas leaks, fires, flooding, electrical hazards) and escalate them instantly with URGENT priority.
-
-🔧 **Expert Troubleshooting**: You have deep knowledge of:
-- Washing machines, dishwashers, dryers (error codes, common fixes)
-- Boilers, heating systems, thermostats
-- Plumbing (leaks, blockages, water pressure)
-- Electrical basics (breakers, outlets, lighting)
-- Locks, doors, windows
-
-💰 **Cost Awareness**: You understand repair costs and help set expectations. When escalating, you provide estimated cost ranges to help with budgeting.
-
-😊 **Tenant Satisfaction**: You're friendly, patient, and reassuring. You celebrate wins when issues are resolved without a callout!
-
-## Troubleshooting Protocol
-
-1. **Assess Urgency First**: Check for any emergency indicators
-2. **Gather Information**: Ask targeted questions to understand the issue
-3. **Guide Step-by-Step**: Provide clear, numbered instructions
-4. **Verify Each Step**: Confirm the tenant completed each action before moving on
-5. **Know When to Stop**: If troubleshooting isn't working after 2-3 attempts, escalate
-
-## Common Quick Fixes (Try These First!)
+## Common Appliance Issues (often user error)
 
 ### Washing Machine
-- Won't start → Check door is fully closed, power outlet, cycle dial position
-- Not draining → Check drain hose isn't kinked, clean filter (usually front bottom)
-- Error codes → Unplug for 60 seconds, then restart
-- Leaking → Check door seal, reduce load size, correct detergent amount
-
-### Boiler/Heating
-- No hot water → Check timer settings, thermostat above 20°C, pressure gauge (should be 1-1.5 bar)
-- Radiators cold → Bleed radiators, check TRV valves aren't at 0
-- Boiler showing error → Note the error code, try resetting (usually a button on front)
+- Not starting: Check door is fully closed, check power outlet, check if cycle selector is set
+- Not draining: Check drain hose isn't kinked, check filter for blockages (usually at front bottom)
+- Leaking: Check door seal, don't overload, use correct detergent amount
+- Error codes: Most can be fixed by unplugging for 1 minute and restarting
 
 ### Dishwasher
-- Not cleaning → Check spray arms aren't blocked, clean filter, use rinse aid
-- Won't start → Ensure door clicks shut, check water supply valve is open
+- Not cleaning well: Check spray arms aren't blocked, use correct detergent
+- Not draining: Clean the filter, check drain hose
+- Won't start: Check door latch, ensure water supply is on
 
-### Plumbing
-- Slow drain → Try plunger, baking soda + vinegar, avoid chemical cleaners
-- Toilet running → Check flapper valve, adjust float
+### Heating/Hot Water
+- No hot water: Check timer settings, check thermostat, check pilot light (for gas)
+- Radiators cold: Bleed the radiators, check TRV settings
 
-## Escalation Triggers (Always Escalate These)
-
-🚨 EMERGENCY (escalate with 'urgent' priority):
-- Gas smell or suspected leak
-- Electrical sparks, burning smell, or smoke
-- Major water leak/flooding
-- No heating when outside temp is below 5°C
-- Security issues (broken locks, break-in damage)
-
-⚠️ HIGH Priority:
-- Complete loss of hot water
-- Boiler not working in cold weather
-- Toilet completely blocked (only toilet in property)
-- Fridge/freezer not cooling (food safety)
+## When to Escalate
+- Electrical issues with sparks, burning smell, or exposed wires
+- Water leaks that can't be stopped
+- Gas-related concerns (always escalate)
+- Structural issues
+- Issues that persist after basic troubleshooting
+- Tenant is uncomfortable doing troubleshooting
 
 ## Communication Style
+- Be friendly and reassuring
+- Explain WHY you're asking questions
+- Give clear, step-by-step instructions
+- Celebrate when issues are resolved without a callout!
 
-- Be warm and reassuring: "Don't worry, we'll figure this out together!"
-- Explain the WHY: "I'm asking about the error code because it tells us exactly what's wrong"
-- Celebrate successes: "Brilliant! You've just saved a £100+ callout! 🎉"
-- Be honest about limitations: "This sounds like it needs a professional - let me get that arranged"
+IMPORTANT: Always use your tools to interact with the system. Use send_message to communicate with the tenant."""
 
-## Tool Usage
-
-ALWAYS use your tools:
-- `send_message_to_tenant` - To communicate with the tenant
-- `log_reasoning` - To document your thought process and analysis
-- `detect_emergency` - To check for emergency keywords in issue descriptions
-- `estimate_repair_cost` - To provide cost estimates when escalating
-- `assess_sentiment` - To track tenant satisfaction
-- `escalate_to_property_manager` - When professional help is needed
-- `resolve_with_troubleshooting` - When you successfully help fix the issue
-- `schedule_followup` - To check back on resolved issues
-
-IMPORTANT: Start every interaction by logging your initial assessment using log_reasoning."""
-
-
-# ============================================================================
-# Enhanced MCP Tools
-# ============================================================================
-
-@tool(
-    "send_message_to_tenant",
-    "Send a message to the tenant. Use this for all communication - questions, instructions, or updates.",
+# Define tools for the agent
+TOOLS = [
     {
-        "issue_id": int,
-        "message": str,
-        "message_type": str,  # greeting, question, instruction, celebration, escalation_notice
-    }
-)
-async def send_message(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Send a message to the tenant with type tracking."""
-    await messages.add_message(
-        args["issue_id"],
-        "agent",
-        args["message"],
-        metadata={"message_type": args.get("message_type", "general")}
-    )
-    await activity.log_activity(
-        args["issue_id"],
-        "sent_message",
-        {
-            "message_preview": args["message"][:100],
-            "message_type": args.get("message_type", "general")
-        },
-        would_notify="tenant"
-    )
-    return {"content": [{"type": "text", "text": f"Message sent to tenant"}]}
-
-
-@tool(
-    "log_reasoning",
-    "Log your analysis, reasoning, or observations. Use this to document your thought process.",
-    {
-        "issue_id": int,
-        "reasoning": str,
-        "category": str,  # initial_assessment, troubleshooting, decision, escalation_reason
-    }
-)
-async def log_reasoning(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Log agent reasoning with category."""
-    await activity.log_activity(
-        args["issue_id"],
-        "reasoning",
-        {
-            "reasoning": args["reasoning"],
-            "category": args.get("category", "general")
+        "name": "send_message",
+        "description": "Send a message to the tenant about their issue. Use this to ask clarifying questions or provide troubleshooting help.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The message to send to the tenant"
+                }
+            },
+            "required": ["message"]
         }
-    )
-    return {"content": [{"type": "text", "text": "Reasoning logged"}]}
-
-
-@tool(
-    "detect_emergency",
-    "Analyze text for emergency indicators. Returns whether this is an emergency and why.",
+    },
     {
-        "issue_id": int,
-        "text": str,
-    }
-)
-async def detect_emergency(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Detect emergency keywords in issue description."""
-    text_lower = args["text"].lower()
-    detected = []
-
-    for keyword in EMERGENCY_KEYWORDS:
-        if keyword in text_lower:
-            detected.append(keyword)
-
-    is_emergency = len(detected) > 0
-
-    if is_emergency:
-        await activity.log_activity(
-            args["issue_id"],
-            "emergency_detected",
-            {"keywords": detected, "text_analyzed": args["text"][:200]},
-            would_notify="property_manager,landlord"
-        )
-
-    return {
-        "content": [{
-            "type": "text",
-            "text": f"Emergency detected: {is_emergency}. Keywords found: {detected}" if detected else "No emergency indicators found."
-        }]
-    }
-
-
-@tool(
-    "estimate_repair_cost",
-    "Estimate the repair cost for an issue. Returns a cost range based on category and severity.",
-    {
-        "issue_id": int,
-        "category": str,  # plumbing, electrical, appliance, heating, structural
-        "severity": str,  # minor, moderate, major
-    }
-)
-async def estimate_repair_cost(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Estimate repair costs based on category and severity."""
-    category = args.get("category", "appliance").lower()
-    severity = args.get("severity", "moderate").lower()
-
-    if category not in REPAIR_COST_ESTIMATES:
-        category = "appliance"  # default
-    if severity not in ["minor", "moderate", "major"]:
-        severity = "moderate"
-
-    cost_range = REPAIR_COST_ESTIMATES[category][severity]
-
-    await activity.log_activity(
-        args["issue_id"],
-        "cost_estimated",
-        {
-            "category": category,
-            "severity": severity,
-            "cost_range_low": cost_range[0],
-            "cost_range_high": cost_range[1]
+        "name": "log_reasoning",
+        "description": "Log your reasoning or observations about the issue. This helps track decision-making.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reasoning": {
+                    "type": "string",
+                    "description": "Your reasoning or observations"
+                }
+            },
+            "required": ["reasoning"]
         }
-    )
-
-    return {
-        "content": [{
-            "type": "text",
-            "text": f"Estimated cost for {severity} {category} issue: £{cost_range[0]} - £{cost_range[1]}"
-        }]
-    }
-
-
-@tool(
-    "assess_sentiment",
-    "Analyze the tenant's sentiment based on their messages. Helps track satisfaction.",
+    },
     {
-        "issue_id": int,
-        "latest_message": str,
-    }
-)
-async def assess_sentiment(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Assess tenant sentiment from their message."""
-    text = args["latest_message"].lower()
-
-    # Simple sentiment indicators
-    positive_words = ["thanks", "thank you", "great", "perfect", "amazing", "worked", "fixed", "brilliant", "helpful"]
-    negative_words = ["frustrated", "angry", "annoyed", "terrible", "useless", "waste", "still not", "doesn't work", "broken"]
-    urgent_words = ["urgent", "emergency", "asap", "immediately", "help", "please help"]
-
-    positive_count = sum(1 for word in positive_words if word in text)
-    negative_count = sum(1 for word in negative_words if word in text)
-    urgent_count = sum(1 for word in urgent_words if word in text)
-
-    # Calculate sentiment score (-1 to 1)
-    if positive_count + negative_count == 0:
-        score = 0.0
-    else:
-        score = (positive_count - negative_count) / (positive_count + negative_count + 1)
-
-    sentiment = "neutral"
-    if score > 0.3:
-        sentiment = "positive"
-    elif score < -0.3:
-        sentiment = "negative"
-
-    if urgent_count > 0:
-        sentiment = f"{sentiment}_urgent"
-
-    await activity.log_activity(
-        args["issue_id"],
-        "sentiment_assessed",
-        {
-            "sentiment": sentiment,
-            "score": score,
-            "positive_indicators": positive_count,
-            "negative_indicators": negative_count
+        "name": "escalate_to_property_manager",
+        "description": "Escalate the issue to the property manager because it requires professional attention.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Why this needs to be escalated"
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "urgent"],
+                    "description": "Priority level for the escalation"
+                }
+            },
+            "required": ["reason", "priority"]
         }
-    )
-
-    return {
-        "content": [{
-            "type": "text",
-            "text": f"Tenant sentiment: {sentiment} (score: {score:.2f})"
-        }]
-    }
-
-
-@tool(
-    "escalate_to_property_manager",
-    "Escalate the issue to the property manager when professional help is needed.",
+    },
     {
-        "issue_id": int,
-        "reason": str,
-        "priority": str,  # low, medium, high, urgent
-        "category": str,  # plumbing, electrical, appliance, heating, structural, security
-        "estimated_cost_low": int,
-        "estimated_cost_high": int,
-    }
-)
-async def escalate_issue(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Escalate to property manager with full context."""
-    await issues.update_issue_status(args["issue_id"], "escalated")
-
-    escalation_message = f"""Issue escalated to property manager.
-
-📋 **Reason**: {args['reason']}
-⚡ **Priority**: {args['priority'].upper()}
-🏷️ **Category**: {args['category']}
-💰 **Estimated Cost**: £{args['estimated_cost_low']} - £{args['estimated_cost_high']}
-
-The AI assistant has completed initial troubleshooting and determined professional help is required."""
-
-    await messages.add_message(
-        args["issue_id"],
-        "system",
-        escalation_message
-    )
-
-    await activity.log_activity(
-        args["issue_id"],
-        "escalated",
-        {
-            "reason": args["reason"],
-            "priority": args["priority"],
-            "category": args["category"],
-            "estimated_cost_low": args["estimated_cost_low"],
-            "estimated_cost_high": args["estimated_cost_high"]
-        },
-        would_notify="property_manager,landlord"
-    )
-
-    return {
-        "content": [{
-            "type": "text",
-            "text": f"Issue escalated with {args['priority']} priority. Estimated cost: £{args['estimated_cost_low']}-£{args['estimated_cost_high']}"
-        }]
-    }
-
-
-@tool(
-    "resolve_with_troubleshooting",
-    "Mark the issue as resolved when you successfully helped the tenant fix it themselves.",
-    {
-        "issue_id": int,
-        "solution": str,
-        "steps_taken": str,
-        "estimated_savings": int,  # Money saved by not calling a professional
-    }
-)
-async def resolve_issue(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Resolve issue with comprehensive tracking."""
-    from datetime import timedelta
-
-    await issues.update_issue_status(
-        args["issue_id"],
-        "resolved_by_agent",
-        resolved_by_agent=args["solution"]
-    )
-
-    resolution_message = f"""🎉 Issue Resolved!
-
-✅ **Solution**: {args['solution']}
-📝 **Steps Taken**: {args['steps_taken']}
-💰 **Estimated Savings**: £{args['estimated_savings']}
-
-Great job troubleshooting this yourself! A follow-up check has been scheduled for 3 days from now."""
-
-    await messages.add_message(
-        args["issue_id"],
-        "system",
-        resolution_message
-    )
-
-    await activity.log_activity(
-        args["issue_id"],
-        "resolved_by_agent",
-        {
-            "solution": args["solution"],
-            "steps_taken": args["steps_taken"],
-            "estimated_savings": args["estimated_savings"]
-        },
-        would_notify="property_manager"
-    )
-
-    # Schedule follow-up
-    follow_up_date = datetime.now() + timedelta(days=3)
-    await issues.set_follow_up_date(args["issue_id"], follow_up_date)
-
-    return {
-        "content": [{
-            "type": "text",
-            "text": f"Issue resolved! Estimated savings: £{args['estimated_savings']}. Follow-up scheduled."
-        }]
-    }
-
-
-@tool(
-    "schedule_followup",
-    "Schedule a follow-up check on the issue.",
-    {
-        "issue_id": int,
-        "days": int,
-        "reason": str,
-    }
-)
-async def schedule_followup(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Schedule a follow-up check."""
-    from datetime import timedelta
-
-    follow_up_date = datetime.now() + timedelta(days=args["days"])
-    await issues.set_follow_up_date(args["issue_id"], follow_up_date)
-
-    await activity.log_activity(
-        args["issue_id"],
-        "scheduled_followup",
-        {
-            "days": args["days"],
-            "date": follow_up_date.isoformat(),
-            "reason": args["reason"]
-        },
-        would_notify="tenant"
-    )
-
-    return {
-        "content": [{
-            "type": "text",
-            "text": f"Follow-up scheduled for {follow_up_date.strftime('%Y-%m-%d')} ({args['days']} days)"
-        }]
-    }
-
-
-@tool(
-    "get_issue_context",
-    "Get the full context of an issue including all messages and history.",
-    {
-        "issue_id": int,
-    }
-)
-async def get_issue_context(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Get full issue context for the agent."""
-    issue = await issues.get_issue(args["issue_id"])
-    conversation = await messages.get_conversation_context(args["issue_id"])
-
-    if not issue:
-        return {"content": [{"type": "text", "text": "Issue not found"}], "is_error": True}
-
-    context = f"""## Issue Details
-- **ID**: {issue['id']}
-- **Title**: {issue['title']}
-- **Description**: {issue['description']}
-- **Category**: {issue.get('category', 'Not specified')}
-- **Status**: {issue['status']}
-- **Priority**: {issue.get('priority', 'medium')}
-- **Created**: {issue.get('created_at', 'Unknown')}
-
-## Conversation History
-{conversation if conversation else '(No previous messages)'}"""
-
-    return {"content": [{"type": "text", "text": context}]}
-
-
-@tool(
-    "get_available_contractors",
-    "Get a list of contractors available for a specific issue category. Use this when escalating to suggest which contractor to assign.",
-    {
-        "issue_id": int,
-        "category": str,  # plumbing, electrical, appliance, heating, structural, security, general
-    }
-)
-async def get_available_contractors(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Get contractors matching the issue category."""
-    category = args.get("category", "general").lower()
-
-    # Get issue to find the organization
-    issue = await issues.get_issue(args["issue_id"])
-    if not issue:
-        return {"content": [{"type": "text", "text": "Issue not found"}], "is_error": True}
-
-    # For now, use a default organization ID
-    # In production, this would come from the property's organization
-    organization_id = "default"
-
-    try:
-        contractor_list = await contractors.get_contractors_for_category(
-            organization_id, category
-        )
-
-        if not contractor_list:
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": f"No contractors found for category '{category}'. The property manager will need to assign one manually."
-                }]
-            }
-
-        # Format contractor list for the agent
-        contractor_info = []
-        for c in contractor_list[:5]:  # Limit to top 5
-            rate = f"£{c['hourly_rate'] / 100}/hr" if c.get('hourly_rate') else "Rate not specified"
-            info = f"- **{c['name']}**"
-            if c.get('company'):
-                info += f" ({c['company']})"
-            info += f" - {c['trade'].title()}"
-            if c.get('phone'):
-                info += f" - {c['phone']}"
-            info += f" - {rate}"
-            contractor_info.append(info)
-
-        await activity.log_activity(
-            args["issue_id"],
-            "contractors_retrieved",
-            {
-                "category": category,
-                "count": len(contractor_list),
-                "contractors": [c['name'] for c in contractor_list[:5]]
-            }
-        )
-
-        return {
-            "content": [{
-                "type": "text",
-                "text": f"Available contractors for {category}:\n\n" + "\n".join(contractor_info)
-            }]
+        "name": "resolve_with_troubleshooting",
+        "description": "Mark the issue as resolved because you helped the tenant fix it themselves with troubleshooting advice.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "solution": {
+                    "type": "string",
+                    "description": "What solved the problem"
+                }
+            },
+            "required": ["solution"]
         }
+    }
+]
 
-    except Exception as e:
-        return {
-            "content": [{
-                "type": "text",
-                "text": f"Error retrieving contractors: {str(e)}"
-            }],
-            "is_error": True
-        }
-
-
-def get_all_tools():
-    """Get all tools for the MCP server."""
-    return [
-        send_message,
-        log_reasoning,
-        detect_emergency,
-        estimate_repair_cost,
-        assess_sentiment,
-        escalate_issue,
-        resolve_issue,
-        schedule_followup,
-        get_issue_context,
-        get_available_contractors,
-    ]
-
-
-def create_fixmate_mcp_server():
-    """Create the FixMate MCP server with all tools."""
-    return create_sdk_mcp_server(
-        name="fixmate",
-        version="2.0.0",
-        tools=get_all_tools()
-    )
-
-
-# ============================================================================
-# Triage Agent Class
-# ============================================================================
 
 class TriageAgent:
-    """Enhanced Triage Agent using Claude Agent SDK.
-
-    Features:
-    - Uses ClaudeSDKClient for multi-turn conversations
-    - Emergency detection and auto-escalation
-    - Cost estimation for repairs
-    - Sentiment tracking
-    - Comprehensive activity logging
-    """
+    """Agent that triages maintenance issues."""
 
     def __init__(self):
-        self.mcp_server = create_fixmate_mcp_server()
+        self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-    def _get_options(self) -> ClaudeAgentOptions:
-        """Get agent options with MCP server configured."""
-        return ClaudeAgentOptions(
-            system_prompt=ENHANCED_SYSTEM_PROMPT,
-            mcp_servers={"fixmate": self.mcp_server},
-            allowed_tools=[
-                "mcp__fixmate__send_message_to_tenant",
-                "mcp__fixmate__log_reasoning",
-                "mcp__fixmate__detect_emergency",
-                "mcp__fixmate__estimate_repair_cost",
-                "mcp__fixmate__assess_sentiment",
-                "mcp__fixmate__escalate_to_property_manager",
-                "mcp__fixmate__resolve_with_troubleshooting",
-                "mcp__fixmate__schedule_followup",
-                "mcp__fixmate__get_issue_context",
-                "mcp__fixmate__get_available_contractors",
-            ],
-            max_turns=10,
-        )
+    async def _execute_tool(self, issue_id: int, tool_name: str, tool_input: dict) -> str:
+        """Execute a tool and return the result."""
+        if tool_name == "send_message":
+            await messages.add_message(issue_id, "agent", tool_input["message"])
+            await activity.log_activity(
+                issue_id,
+                "sent_message",
+                {"message_preview": tool_input["message"][:100]},
+                would_notify="tenant"
+            )
+            return f"Message sent to tenant: {tool_input['message'][:100]}..."
+
+        elif tool_name == "log_reasoning":
+            await activity.log_activity(
+                issue_id,
+                "reasoning",
+                {"reasoning": tool_input["reasoning"]}
+            )
+            return "Reasoning logged"
+
+        elif tool_name == "escalate_to_property_manager":
+            await issues.update_issue_status(issue_id, "escalated")
+            await messages.add_message(
+                issue_id,
+                "system",
+                f"Issue escalated to property manager. Reason: {tool_input['reason']}. Priority: {tool_input['priority']}"
+            )
+            await activity.log_activity(
+                issue_id,
+                "escalated",
+                {"reason": tool_input["reason"], "priority": tool_input["priority"]},
+                would_notify="property_manager,landlord"
+            )
+            return f"Issue escalated with {tool_input['priority']} priority: {tool_input['reason']}"
+
+        elif tool_name == "resolve_with_troubleshooting":
+            await issues.update_issue_status(
+                issue_id,
+                "resolved_by_agent",
+                resolved_by_agent=tool_input["solution"]
+            )
+            await messages.add_message(
+                issue_id,
+                "system",
+                f"Issue resolved with agent assistance: {tool_input['solution']}"
+            )
+            await activity.log_activity(
+                issue_id,
+                "resolved_by_agent",
+                {"solution": tool_input["solution"]},
+                would_notify="property_manager"
+            )
+            return f"Issue resolved! Solution: {tool_input['solution']}"
+
+        return "Unknown tool"
 
     async def handle_new_issue(self, issue_id: int) -> str:
-        """Handle a new issue submission with enhanced processing."""
-        # Get issue details
+        """Handle a new issue submission."""
+        # Get the issue details
         issue = await issues.get_issue(issue_id)
         if not issue:
             return "Issue not found"
@@ -652,107 +184,115 @@ class TriageAgent:
         # Update status to triaging
         await issues.update_issue_status(issue_id, "triaging")
 
+        # Get conversation history
+        conversation = await messages.get_conversation_context(issue_id)
+
         # Build the prompt
-        prompt = f"""A tenant has reported a new maintenance issue. Please help them.
+        prompt = f"""A tenant has reported a maintenance issue. Please analyze it and help them.
 
 ## Issue Details
-- **Issue ID**: {issue_id}
 - **Title**: {issue['title']}
 - **Description**: {issue['description']}
 - **Category**: {issue.get('category', 'Not specified')}
+- **Issue ID**: {issue_id}
+
+## Previous Conversation
+{conversation if conversation else "(No previous messages)"}
 
 ## Your Task
-1. First, use `detect_emergency` to check if this is an emergency
-2. Use `log_reasoning` to document your initial assessment (category: initial_assessment)
-3. If it's an emergency, immediately escalate with 'urgent' priority
-4. Otherwise, use `send_message_to_tenant` to greet them and ask clarifying questions or provide troubleshooting steps
-5. Use `assess_sentiment` to track how the tenant is feeling
+1. First, log your initial assessment using log_reasoning
+2. Then send a helpful message to the tenant asking clarifying questions or providing troubleshooting steps
+3. Focus on the most likely simple fix based on the description
 
-Remember: Your goal is to help resolve this without a callout if possible, but NEVER compromise on safety."""
+Remember: Your goal is to help resolve issues without unnecessary callouts when possible. Start by analyzing what's described and suggest the most likely troubleshooting steps."""
 
-        return await self._run_agent(prompt)
+        return await self._run_agent(issue_id, prompt)
 
     async def handle_tenant_response(self, issue_id: int, tenant_message: str) -> str:
-        """Handle a tenant's response with sentiment tracking."""
+        """Handle a tenant's response in an ongoing conversation."""
         # Record the tenant message
         await messages.add_message(issue_id, "tenant", tenant_message)
 
-        # Get issue details
+        # Get the issue and full conversation
         issue = await issues.get_issue(issue_id)
         if not issue:
             return "Issue not found"
 
-        # Get conversation history
         conversation = await messages.get_conversation_context(issue_id)
 
         prompt = f"""The tenant has responded to your previous message. Continue helping them.
 
 ## Issue Details
-- **Issue ID**: {issue_id}
 - **Title**: {issue['title']}
+- **Description**: {issue['description']}
 - **Status**: {issue['status']}
-- **Category**: {issue.get('category', 'Not specified')}
+- **Issue ID**: {issue_id}
 
 ## Conversation So Far
 {conversation}
 
-## Latest Tenant Message
-"{tenant_message}"
-
 ## Your Task
-1. Use `assess_sentiment` to understand how the tenant is feeling
-2. Use `log_reasoning` to document your analysis of their response
-3. Based on their response:
-   - If they confirmed a fix worked → use `resolve_with_troubleshooting` to celebrate!
-   - If troubleshooting failed after 2-3 attempts → use `escalate_to_property_manager`
-   - If they need more help → use `send_message_to_tenant` with next steps
-4. If escalating, use `estimate_repair_cost` first to include cost estimates"""
+Based on the tenant's response, continue the troubleshooting process:
+1. If they confirmed something works, move to the next step or mark as resolved
+2. If troubleshooting failed, try alternative approaches or escalate
+3. If they provided new information, incorporate it into your assessment"""
 
-        return await self._run_agent(prompt)
+        return await self._run_agent(issue_id, prompt)
 
-    async def _run_agent(self, prompt: str) -> str:
-        """Run the agent with the Claude SDK."""
-        options = self._get_options()
+    async def _run_agent(self, issue_id: int, prompt: str) -> str:
+        """Run the agent with tool use loop."""
+        messages_list = [{"role": "user", "content": prompt}]
 
-        try:
-            async with ClaudeSDKClient(options=options) as client:
-                await client.query(prompt)
-
-                result_text = ""
-                async for message in client.receive_response():
-                    if isinstance(message, AssistantMessage):
-                        for block in message.content:
-                            if isinstance(block, TextBlock):
-                                result_text = block.text
-                    elif isinstance(message, ResultMessage):
-                        # Agent completed
-                        if message.is_error:
-                            return f"Agent error: {message.result}"
-                        return result_text or "Agent completed"
-
-                return result_text or "Agent completed"
-
-        except Exception as e:
-            # Log the error and return gracefully
-            await activity.log_activity(
-                None,
-                "agent_error",
-                {"error": str(e), "prompt_preview": prompt[:200]}
+        # Agent loop - max 5 turns
+        for _ in range(5):
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1024,
+                system=TRIAGE_SYSTEM_PROMPT,
+                tools=TOOLS,
+                messages=messages_list
             )
-            raise
+
+            # Check if we're done (no more tool use)
+            if response.stop_reason == "end_turn":
+                # Extract any final text
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        return block.text
+                return "Agent completed"
+
+            # Process tool calls
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    result = await self._execute_tool(issue_id, block.name, block.input)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result
+                    })
+
+            if not tool_results:
+                break
+
+            # Add assistant message and tool results
+            messages_list.append({"role": "assistant", "content": response.content})
+            messages_list.append({"role": "user", "content": tool_results})
+
+        return "Agent loop completed"
 
 
 # ============================================================================
-# Analytics & Reporting (Bonus Feature for Investors)
+# Analytics & Reporting (for investor demos)
 # ============================================================================
 
 class AgentAnalytics:
     """Analytics for agent performance - great for investor demos!"""
 
     @staticmethod
-    async def get_resolution_stats() -> Dict[str, Any]:
+    async def get_resolution_stats():
         """Get statistics on agent resolution performance."""
-        from app.db.database import fetch_one, fetch_all
+        from app.db.database import fetch_one
 
         # Total issues
         total = await fetch_one("SELECT COUNT(*) as count FROM issues")
@@ -784,7 +324,7 @@ class AgentAnalytics:
         }
 
     @staticmethod
-    async def get_category_breakdown() -> List[Dict[str, Any]]:
+    async def get_category_breakdown():
         """Get issue breakdown by category."""
         from app.db.database import fetch_all
 
@@ -802,7 +342,7 @@ class AgentAnalytics:
         return [dict(row) for row in rows] if rows else []
 
     @staticmethod
-    async def get_response_time_stats() -> Dict[str, Any]:
+    async def get_response_time_stats():
         """Get agent response time statistics."""
         from app.db.database import fetch_one
 
