@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/mk-162/fixMate/compare/v1.15.0...v1.15.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* team member messages no longer trigger AI response ([ac5cefe](https://github.com/mk-162/fixMate/commit/ac5cefe8bbe5ee38b3a8d01277ed038daa9de6c0))
+
 # [1.15.0](https://github.com/mk-162/fixMate/compare/v1.14.5...v1.15.0) (2026-01-04)
 
 
