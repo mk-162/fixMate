@@ -1,3 +1,11 @@
+# [1.13.0](https://github.com/mk-162/fixMate/compare/v1.12.4...v1.13.0) (2026-01-04)
+
+
+### Features
+
+* add public pages for guide, wishlist, features, FAQ, and plans ([171f2fe](https://github.com/mk-162/fixMate/commit/171f2fe75aec4a5a9007a42fb1f4523e6aa06b46))
+* whatsapp agent quick wins - context, new issue cmd, resolution confirmation ([e03d9cb](https://github.com/mk-162/fixMate/commit/e03d9cb62391c521231ce72c5cb3980b22413fdd))
+
 ## [1.12.4](https://github.com/mk-162/fixMate/compare/v1.12.3...v1.12.4) (2026-01-04)
 
 
