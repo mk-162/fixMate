@@ -162,10 +162,14 @@ export const FixmateAPI = {
     return apiRequest(`/api/issues/${issueId}/messages`);
   },
 
-  async sendMessage(issueId: number, message: string): Promise<{ status: string; message: string }> {
+  async sendMessage(
+    issueId: number,
+    message: string,
+    role: 'tenant' | 'team' = 'team',
+  ): Promise<{ status: string; message: string }> {
     return apiRequest(`/api/issues/${issueId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, role }),
     });
   },
 

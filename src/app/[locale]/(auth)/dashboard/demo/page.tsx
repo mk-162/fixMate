@@ -147,8 +147,8 @@ export default function DemoPage() {
         // Start new conversation
         await startConversation(message);
       } else {
-        // Continue existing conversation
-        await FixmateAPI.sendMessage(activeIssue.id, message);
+        // Continue existing conversation (demo simulates tenant)
+        await FixmateAPI.sendMessage(activeIssue.id, message, 'tenant');
 
         // Wait for agent response
         await new Promise(resolve => setTimeout(resolve, 2000));
