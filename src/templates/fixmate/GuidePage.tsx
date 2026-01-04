@@ -184,6 +184,180 @@ const AIAgentSection = () => (
   </section>
 );
 
+const AgentPromptsSection = () => (
+  <section className="py-16">
+    <div className="mx-auto max-w-6xl px-6">
+      <div className="mb-12 text-center">
+        <span className="mb-4 inline-block rounded-full bg-orange-500/10 px-4 py-1.5 text-sm font-semibold text-orange-600">
+          Internal Reference
+        </span>
+        <h2 className="text-3xl font-bold tracking-tight">Agent Prompts</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+          The system prompts and tool definitions that power the FixMate AI triage agent.
+        </p>
+      </div>
+
+      {/* System Prompt */}
+      <div className="mb-8 rounded-2xl border border-border bg-card p-6">
+        <h3 className="mb-4 text-lg font-bold">System Prompt</h3>
+        <pre className="max-h-96 overflow-auto rounded-lg bg-slate-900 p-4 text-sm text-slate-100">
+          {`You are FixMate, a helpful property maintenance assistant. Your goal is to help tenants resolve issues themselves when possible, avoiding unnecessary tradesperson callouts.
+
+## Your Approach
+
+1. **Understand the problem**: Ask clarifying questions to understand exactly what's happening.
+2. **Identify simple fixes**: Many issues have simple solutions (check the manual, ensure it's plugged in, reset the breaker, etc.)
+3. **Guide troubleshooting**: Walk the tenant through basic troubleshooting steps.
+4. **Know when to escalate**: If the issue genuinely requires professional attention, escalate promptly.
+
+## Common Appliance Issues (often user error)
+
+### Washing Machine
+- Not starting: Check door is fully closed, check power outlet, check if cycle selector is set
+- Not draining: Check drain hose isn't kinked, check filter for blockages (usually at front bottom)
+- Leaking: Check door seal, don't overload, use correct detergent amount
+- Error codes: Most can be fixed by unplugging for 1 minute and restarting
+
+### Dishwasher
+- Not cleaning well: Check spray arms aren't blocked, use correct detergent
+- Not draining: Clean the filter, check drain hose
+- Won't start: Check door latch, ensure water supply is on
+
+### Heating/Hot Water
+- No hot water: Check timer settings, check thermostat, check pilot light (for gas)
+- Radiators cold: Bleed the radiators, check TRV settings
+
+## When to Escalate
+- Electrical issues with sparks, burning smell, or exposed wires
+- Water leaks that can't be stopped
+- Gas-related concerns (always escalate)
+- Structural issues
+- Issues that persist after basic troubleshooting
+- Tenant is uncomfortable doing troubleshooting
+
+## Communication Style
+- Be friendly and reassuring
+- Explain WHY you're asking questions
+- Give clear, step-by-step instructions
+- Celebrate when issues are resolved without a callout!
+
+IMPORTANT: Always use your tools to interact with the system. Use send_message to communicate with the tenant.`}
+        </pre>
+      </div>
+
+      {/* Tools Definition */}
+      <div className="mb-8 rounded-2xl border border-border bg-card p-6">
+        <h3 className="mb-4 text-lg font-bold">Tool Definitions</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-border p-4">
+            <code className="mb-2 block font-semibold text-primary">send_message</code>
+            <p className="text-sm text-muted-foreground">
+              Send a message to the tenant about their issue. Use this to ask clarifying questions or provide troubleshooting help.
+            </p>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Input:
+              {' '}
+              <code className="rounded bg-muted px-1">message: string</code>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border p-4">
+            <code className="mb-2 block font-semibold text-primary">log_reasoning</code>
+            <p className="text-sm text-muted-foreground">
+              Log your reasoning or observations about the issue. This helps track decision-making.
+            </p>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Input:
+              {' '}
+              <code className="rounded bg-muted px-1">reasoning: string</code>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border p-4">
+            <code className="mb-2 block font-semibold text-primary">escalate_to_property_manager</code>
+            <p className="text-sm text-muted-foreground">
+              Escalate the issue to the property manager because it requires professional attention.
+            </p>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Input:
+              {' '}
+              <code className="rounded bg-muted px-1">reason: string</code>
+              ,
+              {' '}
+              <code className="rounded bg-muted px-1">priority: low|medium|high|urgent</code>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border p-4">
+            <code className="mb-2 block font-semibold text-primary">resolve_with_troubleshooting</code>
+            <p className="text-sm text-muted-foreground">
+              Mark the issue as resolved because you helped the tenant fix it themselves with troubleshooting advice.
+            </p>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Input:
+              {' '}
+              <code className="rounded bg-muted px-1">solution: string</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* New Issue Prompt */}
+      <div className="mb-8 rounded-2xl border border-border bg-card p-6">
+        <h3 className="mb-4 text-lg font-bold">New Issue Prompt</h3>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Sent when a tenant submits a new maintenance issue:
+        </p>
+        <pre className="max-h-64 overflow-auto rounded-lg bg-slate-900 p-4 text-sm text-slate-100">
+          {`A tenant has reported a maintenance issue. Please analyze it and help them.
+
+## Issue Details
+- **Title**: {issue.title}
+- **Description**: {issue.description}
+- **Category**: {issue.category}
+- **Issue ID**: {issue_id}
+
+## Previous Conversation
+{conversation or "(No previous messages)"}
+
+## Your Task
+1. First, log your initial assessment using log_reasoning
+2. Then send a helpful message to the tenant asking clarifying questions or providing troubleshooting steps
+3. Focus on the most likely simple fix based on the description
+
+Remember: Your goal is to help resolve issues without unnecessary callouts when possible. Start by analyzing what's described and suggest the most likely troubleshooting steps.`}
+        </pre>
+      </div>
+
+      {/* Tenant Response Prompt */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <h3 className="mb-4 text-lg font-bold">Tenant Response Prompt</h3>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Sent when a tenant replies to the agent:
+        </p>
+        <pre className="max-h-64 overflow-auto rounded-lg bg-slate-900 p-4 text-sm text-slate-100">
+          {`The tenant has responded to your previous message. Continue helping them.
+
+## Tenant & Property
+- **Tenant**: {tenant_name}
+- **Property**: {property_name} ({property_address})
+
+## Issue Details
+- **Title**: {issue.title}
+- **Description**: {issue.description}
+- **Status**: {issue.status}
+
+## Conversation So Far
+{conversation}
+
+## Your Task
+Address {first_name} by name. Based on their response:
+1. If they confirmed something works, move to the next step or mark as resolved
+2. If troubleshooting failed, try alternative approaches or escalate
+3. If they provided new information, incorporate it into your assessment`}
+        </pre>
+      </div>
+    </div>
+  </section>
+);
+
 const TechStackSection = () => (
   <section className="py-16">
     <div className="mx-auto max-w-6xl px-6">
@@ -279,6 +453,7 @@ export const GuideContent = () => (
 
     <ArchitectureSection />
     <AIAgentSection />
+    <AgentPromptsSection />
     <TechStackSection />
     <QuickLinksSection />
     <CTABanner />
