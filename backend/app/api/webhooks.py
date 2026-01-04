@@ -610,14 +610,18 @@ async def send_twilio_agent_response(issue_id: int, phone: str):
     """
     # Get recent messages
     recent_messages = await messages.get_messages(issue_id)
+    print(f"[SEND RESPONSE] Got {len(recent_messages)} messages for issue {issue_id}", flush=True)
 
     # Find the most recent agent message
     for msg in reversed(recent_messages):
+        print(f"[SEND RESPONSE] Checking msg role={msg['role']}", flush=True)
         if msg["role"] == "agent":
+            print(f"[SEND RESPONSE] Found agent message: {msg['content'][:50]}...", flush=True)
             result = await twilio_client.send_message(
                 phone,
                 msg["content"]
             )
+            print(f"[SEND RESPONSE] Twilio result: {result}", flush=True)
 
             if result.get("sent"):
                 await activity.log_activity(
@@ -638,7 +642,10 @@ async def send_twilio_agent_response(issue_id: int, phone: str):
                         "error": result.get("error"),
                     }
                 )
-            break
+            return result
+
+    print(f"[SEND RESPONSE] No agent message found!", flush=True)
+    return None
 
 
 @router.post("/webhooks/twilio", response_class=PlainTextResponse)
