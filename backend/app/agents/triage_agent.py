@@ -28,7 +28,7 @@ from claude_agent_sdk import (
     ResultMessage,
 )
 
-from app.db import issues, messages, activity
+from app.db import issues, messages, activity, contractors
 
 
 class UrgencyLevel(Enum):
@@ -505,6 +505,80 @@ async def get_issue_context(args: Dict[str, Any]) -> Dict[str, Any]:
     return {"content": [{"type": "text", "text": context}]}
 
 
+@tool(
+    "get_available_contractors",
+    "Get a list of contractors available for a specific issue category. Use this when escalating to suggest which contractor to assign.",
+    {
+        "issue_id": int,
+        "category": str,  # plumbing, electrical, appliance, heating, structural, security, general
+    }
+)
+async def get_available_contractors(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Get contractors matching the issue category."""
+    category = args.get("category", "general").lower()
+
+    # Get issue to find the organization
+    issue = await issues.get_issue(args["issue_id"])
+    if not issue:
+        return {"content": [{"type": "text", "text": "Issue not found"}], "is_error": True}
+
+    # For now, use a default organization ID
+    # In production, this would come from the property's organization
+    organization_id = "default"
+
+    try:
+        contractor_list = await contractors.get_contractors_for_category(
+            organization_id, category
+        )
+
+        if not contractor_list:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"No contractors found for category '{category}'. The property manager will need to assign one manually."
+                }]
+            }
+
+        # Format contractor list for the agent
+        contractor_info = []
+        for c in contractor_list[:5]:  # Limit to top 5
+            rate = f"£{c['hourly_rate'] / 100}/hr" if c.get('hourly_rate') else "Rate not specified"
+            info = f"- **{c['name']}**"
+            if c.get('company'):
+                info += f" ({c['company']})"
+            info += f" - {c['trade'].title()}"
+            if c.get('phone'):
+                info += f" - {c['phone']}"
+            info += f" - {rate}"
+            contractor_info.append(info)
+
+        await activity.log_activity(
+            args["issue_id"],
+            "contractors_retrieved",
+            {
+                "category": category,
+                "count": len(contractor_list),
+                "contractors": [c['name'] for c in contractor_list[:5]]
+            }
+        )
+
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"Available contractors for {category}:\n\n" + "\n".join(contractor_info)
+            }]
+        }
+
+    except Exception as e:
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"Error retrieving contractors: {str(e)}"
+            }],
+            "is_error": True
+        }
+
+
 def get_all_tools():
     """Get all tools for the MCP server."""
     return [
@@ -517,6 +591,7 @@ def get_all_tools():
         resolve_issue,
         schedule_followup,
         get_issue_context,
+        get_available_contractors,
     ]
 
 
@@ -562,6 +637,7 @@ class TriageAgent:
                 "mcp__fixmate__resolve_with_troubleshooting",
                 "mcp__fixmate__schedule_followup",
                 "mcp__fixmate__get_issue_context",
+                "mcp__fixmate__get_available_contractors",
             ],
             max_turns=10,
         )

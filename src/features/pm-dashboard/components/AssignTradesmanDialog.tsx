@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { CalendarIcon, Phone, PoundSterling } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import {
   AlertDialog,
@@ -12,7 +13,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  assignContractorToIssue,
+  getContractors,
+  getContractorsForCategory,
+} from '@/features/contractors/actions/contractorActions';
+import { type ContractorTrade, tradeLabels } from '@/features/contractors/schemas/contractorSchema';
 import type { Issue } from '@/libs/FixmateAPI';
+import type { Contractor } from '@/models/Schema';
 
 type AssignTradesmanDialogProps = {
   issue: Issue | null;
@@ -21,48 +31,107 @@ type AssignTradesmanDialogProps = {
   onAssign: (issueId: number, tradesperson: string) => Promise<void>;
 };
 
-// Demo tradesperson options - in production, this would come from an API
-const TRADESPERSON_OPTIONS = [
-  { id: 'quick-fix-plumbing', name: 'Quick Fix Plumbing', specialty: 'Plumbing', rating: 4.8 },
-  { id: 'spark-electric', name: 'Spark Electric Ltd', specialty: 'Electrical', rating: 4.9 },
-  { id: 'handy-home-repairs', name: 'Handy Home Repairs', specialty: 'General', rating: 4.6 },
-  { id: 'heat-masters', name: 'Heat Masters', specialty: 'Heating & HVAC', rating: 4.7 },
-  { id: 'apex-maintenance', name: 'Apex Maintenance Co', specialty: 'General', rating: 4.5 },
-];
-
 export function AssignTradesmanDialog({
   issue,
   open,
   onOpenChange,
   onAssign,
 }: AssignTradesmanDialogProps) {
-  const [selectedTradesperson, setSelectedTradesperson] = useState<string>('');
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [customTradesperson, setCustomTradesperson] = useState('');
+  const [scheduledFor, setScheduledFor] = useState('');
+  const [notes, setNotes] = useState('');
+  const [quotedAmount, setQuotedAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingContractors, setLoadingContractors] = useState(false);
+
+  // Fetch contractors when dialog opens
+  useEffect(() => {
+    if (open && issue) {
+      setLoadingContractors(true);
+      const fetchContractors = async () => {
+        try {
+          // Try to get contractors matching the issue category
+          const category = issue.category || 'general';
+          const result = await getContractorsForCategory(category);
+          if (result.data.length > 0) {
+            setContractors(result.data);
+          } else {
+            // Fallback to all contractors
+            const allResult = await getContractors({ isActive: 1 });
+            setContractors(allResult.data);
+          }
+        } catch (err) {
+          console.error('Failed to load contractors:', err);
+          setContractors([]);
+        } finally {
+          setLoadingContractors(false);
+        }
+      };
+      fetchContractors();
+    }
+  }, [open, issue]);
+
+  const resetForm = () => {
+    setSelectedContractor(null);
+    setCustomTradesperson('');
+    setScheduledFor('');
+    setNotes('');
+    setQuotedAmount('');
+  };
 
   const handleAssign = async () => {
     if (!issue) {
       return;
     }
 
-    const tradesperson = selectedTradesperson === 'custom' ? customTradesperson : selectedTradesperson;
-    if (!tradesperson.trim()) {
-      return;
-    }
-
     setLoading(true);
     try {
-      await onAssign(issue.id, tradesperson);
+      if (selectedContractor) {
+        // Use the new contractor assignment system
+        await assignContractorToIssue({
+          issueId: issue.id,
+          contractorId: selectedContractor.id,
+          scheduledFor: scheduledFor ? new Date(scheduledFor) : undefined,
+          notes: notes || undefined,
+          quotedAmount: quotedAmount ? Number.parseInt(quotedAmount, 10) * 100 : undefined,
+        });
+
+        // Also call the original onAssign for compatibility
+        const contractorName = selectedContractor.company
+          ? `${selectedContractor.name} (${selectedContractor.company})`
+          : selectedContractor.name;
+        await onAssign(issue.id, contractorName);
+      } else if (customTradesperson.trim()) {
+        // Fallback to manual entry (legacy behavior)
+        await onAssign(issue.id, customTradesperson.trim());
+      }
+
       onOpenChange(false);
-      setSelectedTradesperson('');
-      setCustomTradesperson('');
+      resetForm();
     } finally {
       setLoading(false);
     }
   };
 
+  const formatRate = (rateInPence: number | null) => {
+    if (!rateInPence) {
+      return null;
+    }
+    return `£${(rateInPence / 100).toFixed(0)}/hr`;
+  };
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        onOpenChange(isOpen);
+        if (!isOpen) {
+          resetForm();
+        }
+      }}
+    >
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
@@ -74,7 +143,7 @@ export function AssignTradesmanDialog({
                 d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
               />
             </svg>
-            Assign Tradesperson
+            Assign Contractor
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div>
@@ -82,46 +151,87 @@ export function AssignTradesmanDialog({
                 <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="font-medium text-slate-700">{issue.title}</p>
                   <p className="mt-1 line-clamp-2 text-sm text-slate-500">{issue.description}</p>
+                  {issue.category && (
+                    <span className="mt-2 inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">
+                      {issue.category}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="mt-4 space-y-3">
-          <p className="text-sm font-medium text-slate-700">
-            Select a tradesperson
-          </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-slate-700">
+              Select a contractor
+            </p>
 
-          <div className="grid gap-2">
-            {TRADESPERSON_OPTIONS.map(tp => (
-              <button
-                key={tp.id}
-                type="button"
-                onClick={() => {
-                  setSelectedTradesperson(tp.name);
-                  setCustomTradesperson('');
-                }}
-                className={`flex items-center justify-between rounded-lg border p-3 text-left transition-all ${
-                  selectedTradesperson === tp.name
-                    ? 'border-teal-300 bg-teal-50 ring-2 ring-teal-100'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                <div>
-                  <p className="font-medium text-slate-700">{tp.name}</p>
-                  <p className="text-xs text-slate-500">{tp.specialty}</p>
-                </div>
-                <div className="flex items-center gap-1 text-sm text-amber-600">
-                  <svg className="size-4 fill-current" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                  {tp.rating}
-                </div>
-              </button>
-            ))}
+            {loadingContractors
+              ? (
+                  <div className="mt-2 flex items-center justify-center py-8">
+                    <div className="size-6 animate-spin rounded-full border-2 border-teal-600 border-t-transparent" />
+                  </div>
+                )
+              : contractors.length === 0
+                ? (
+                    <div className="mt-2 rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
+                      No contractors found.
+                      {' '}
+                      <a href="/dashboard/contractors" className="text-teal-600 hover:underline">
+                        Add contractors
+                      </a>
+                      {' '}
+                      to your directory.
+                    </div>
+                  )
+                : (
+                    <div className="mt-2 grid max-h-48 gap-2 overflow-y-auto">
+                      {contractors.map(contractor => (
+                        <button
+                          key={contractor.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedContractor(contractor);
+                            setCustomTradesperson('');
+                          }}
+                          className={`flex items-center justify-between rounded-lg border p-3 text-left transition-all ${
+                            selectedContractor?.id === contractor.id
+                              ? 'border-teal-300 bg-teal-50 ring-2 ring-teal-100'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium text-slate-700">{contractor.name}</p>
+                            <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                              {contractor.company && <span>{contractor.company}</span>}
+                              <span className="rounded-full bg-slate-100 px-1.5 py-0.5">
+                                {tradeLabels[contractor.trade as ContractorTrade] || contractor.trade}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {contractor.phone && (
+                              <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <Phone className="size-3" />
+                                {contractor.phone}
+                              </div>
+                            )}
+                            {contractor.hourlyRate && (
+                              <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <PoundSterling className="size-3" />
+                                {formatRate(contractor.hourlyRate)}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
           </div>
 
+          {/* Divider */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-slate-200" />
@@ -138,20 +248,63 @@ export function AssignTradesmanDialog({
             onChange={(e) => {
               setCustomTradesperson(e.target.value);
               if (e.target.value) {
-                setSelectedTradesperson('custom');
-              } else {
-                setSelectedTradesperson('');
+                setSelectedContractor(null);
               }
             }}
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm transition-colors placeholder:text-slate-400 focus:border-teal-300 focus:outline-none focus:ring-2 focus:ring-teal-100"
           />
+
+          {/* Additional fields when contractor is selected */}
+          {selectedContractor && (
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="scheduledFor" className="text-xs">
+                    <CalendarIcon className="mr-1 inline-block size-3" />
+                    Scheduled For
+                  </Label>
+                  <Input
+                    id="scheduledFor"
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={e => setScheduledFor(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="quotedAmount" className="text-xs">
+                    <PoundSterling className="mr-1 inline-block size-3" />
+                    Quoted Amount (£)
+                  </Label>
+                  <Input
+                    id="quotedAmount"
+                    type="number"
+                    placeholder="150"
+                    value={quotedAmount}
+                    onChange={e => setQuotedAmount(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="notes" className="text-xs">Notes</Label>
+                <Input
+                  id="notes"
+                  placeholder="Any additional notes for the contractor..."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <AlertDialogFooter className="mt-6">
           <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
           <Button
             onClick={handleAssign}
-            disabled={loading || (!selectedTradesperson && !customTradesperson)}
+            disabled={loading || (!selectedContractor && !customTradesperson.trim())}
             className="bg-teal-600 text-white hover:bg-teal-700"
           >
             {loading

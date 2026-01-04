@@ -5,7 +5,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 import { getDb } from '@/libs/DB';
-import { issuesSchema, propertiesSchema, tenantsSchema } from '@/models/Schema';
+import { issuesSchema, propertiesSchema, roomsSchema, tenantsSchema } from '@/models/Schema';
 
 import {
   propertyFormSchema,
@@ -183,6 +183,13 @@ export async function getPropertyWithDetails(id: number) {
     throw new Error('Property not found');
   }
 
+  // Get rooms for this property
+  const rooms = await db
+    .select()
+    .from(roomsSchema)
+    .where(eq(roomsSchema.propertyId, id))
+    .orderBy(roomsSchema.roomName);
+
   // Get tenants for this property
   const tenants = await db
     .select({
@@ -197,6 +204,20 @@ export async function getPropertyWithDetails(id: number) {
     })
     .from(tenantsSchema)
     .where(eq(tenantsSchema.propertyId, id));
+
+  // Map tenants to rooms
+  const tenantsByRoom = new Map<number, typeof tenants[number]>();
+  for (const tenant of tenants) {
+    if (tenant.roomId) {
+      tenantsByRoom.set(tenant.roomId, tenant);
+    }
+  }
+
+  // Combine rooms with tenants
+  const roomsWithTenants = rooms.map(room => ({
+    ...room,
+    tenant: tenantsByRoom.get(room.id) ?? null,
+  }));
 
   // Get issues for this property
   const issues = await db
@@ -217,9 +238,13 @@ export async function getPropertyWithDetails(id: number) {
 
   return {
     property,
+    rooms: roomsWithTenants,
     tenants,
     issues,
     stats: {
+      roomCount: rooms.length,
+      occupiedRoomCount: rooms.filter(r => r.status === 'occupied').length + tenants.filter(t => t.roomId).length,
+      availableRoomCount: rooms.filter(r => r.status === 'available' && !tenantsByRoom.has(r.id)).length,
       tenantCount: tenants.length,
       activeIssueCount: issues.filter(i => !['closed', 'resolved_by_agent'].includes(i.status)).length,
       resolvedIssueCount: issues.filter(i => ['closed', 'resolved_by_agent'].includes(i.status)).length,

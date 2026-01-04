@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Bed,
   ClipboardList,
   DollarSign,
   Home,
@@ -16,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getPropertyWithDetails } from '@/features/properties/actions/propertyActions';
 import { PropertyStatusBadge } from '@/features/properties/components/PropertyStatusBadge';
+import { RoomList } from '@/features/rooms/components/RoomList';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -70,7 +72,7 @@ export default async function PropertyDetailPage(props: Props) {
     notFound();
   }
 
-  const { property, tenants, issues, stats } = data;
+  const { property, rooms, tenants, issues, stats } = data;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -110,15 +112,26 @@ export default async function PropertyDetailPage(props: Props) {
       </div>
 
       {/* Stats Row */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-5">
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-blue-100 p-2 text-blue-600">
+              <Bed className="size-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.roomCount}</p>
+              <p className="text-sm text-muted-foreground">Rooms</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className={`rounded-lg p-2 ${stats.availableRoomCount > 0 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
               <Home className="size-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{property.totalRooms}</p>
-              <p className="text-sm text-muted-foreground">Rooms</p>
+              <p className="text-2xl font-bold">{stats.availableRoomCount}</p>
+              <p className="text-sm text-muted-foreground">Available</p>
             </div>
           </div>
         </div>
@@ -155,6 +168,11 @@ export default async function PropertyDetailPage(props: Props) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Rooms Section */}
+      <div className="mb-8">
+        <RoomList propertyId={property.id} initialRooms={rooms} />
       </div>
 
       {/* Two Column Layout */}

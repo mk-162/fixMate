@@ -6,6 +6,7 @@ import {
   ClipboardList,
   GraduationCap,
   Mail,
+  Pencil,
   Phone,
   Shield,
   User,
@@ -120,6 +121,12 @@ export default async function TenantDetailPage(props: Props) {
               )}
             </div>
           </div>
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/tenants/${tenant.id}/edit`}>
+              <Pencil className="mr-2 size-4" />
+              Edit
+            </Link>
+          </Button>
         </div>
       </div>
 
