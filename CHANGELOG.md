@@ -1,3 +1,11 @@
+## [1.14.4](https://github.com/mk-162/fixMate/compare/v1.14.3...v1.14.4) (2026-01-04)
+
+
+### Bug Fixes
+
+* use boolean true for isActive comparisons (drizzle type fix) ([c2f4f02](https://github.com/mk-162/fixMate/commit/c2f4f0216349b5cb3620537f666db03979bd61f8))
+* use boolean true instead of 1 for isActive comparisons ([cc77814](https://github.com/mk-162/fixMate/commit/cc77814ffc6fe9a970a899af047878d1d9823d63))
+
 ## [1.14.3](https://github.com/mk-162/fixMate/compare/v1.14.2...v1.14.3) (2026-01-04)
 
 
