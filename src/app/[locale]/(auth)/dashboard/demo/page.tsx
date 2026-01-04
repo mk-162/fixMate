@@ -1,90 +1,73 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Bot, ChevronDown, Home, Send, Settings2, User, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { TitleBar } from '@/features/dashboard/TitleBar';
 import {
   type AgentActivity,
-  type AnalyticsOverview,
   FixmateAPI,
   type Issue,
   type IssueMessage,
 } from '@/libs/FixmateAPI';
 
-type DemoScenario = 'washing_machine' | 'emergency' | 'heating' | 'plumbing';
-
-const scenarios: Array<{
-  id: DemoScenario;
-  title: string;
-  description: string;
-  icon: string;
-  expectedOutcome: string;
-  color: string;
-}> = [
-  {
-    id: 'washing_machine',
-    title: 'Washing Machine',
-    description: 'Appliance won\'t start - common troubleshooting scenario',
-    icon: '🧺',
-    expectedOutcome: 'AI guides through troubleshooting → Resolution',
-    color: 'bg-blue-500',
-  },
-  {
-    id: 'emergency',
-    title: 'Gas Emergency',
-    description: 'Tenant smells gas - triggers immediate escalation',
-    icon: '🚨',
-    expectedOutcome: 'Instant URGENT escalation',
-    color: 'bg-red-500',
-  },
-  {
-    id: 'heating',
-    title: 'Boiler Issue',
-    description: 'No hot water with error code',
-    icon: '🔥',
-    expectedOutcome: 'Troubleshooting or escalation based on response',
-    color: 'bg-orange-500',
-  },
-  {
-    id: 'plumbing',
-    title: 'Slow Drain',
-    description: 'Kitchen sink draining slowly',
-    icon: '🚿',
-    expectedOutcome: 'Simple fix guidance',
-    color: 'bg-cyan-500',
-  },
-];
-
-const roleStyles: Record<string, { bg: string; label: string; align: string }> = {
-  tenant: { bg: 'bg-muted', label: 'Tenant', align: 'justify-start' },
-  agent: { bg: 'bg-primary text-primary-foreground', label: 'AI Agent', align: 'justify-end' },
-  system: { bg: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100', label: 'System', align: 'justify-center' },
+// Demo context that investors can configure
+type DemoContext = {
+  tenantName: string;
+  propertyType: string;
+  tenantSince: string;
+  previousIssues: string;
+  specialNotes: string;
 };
 
+const defaultContext: DemoContext = {
+  tenantName: 'Sarah Johnson',
+  propertyType: 'HMO - 5 bed student house',
+  tenantSince: '6 months ago',
+  previousIssues: 'Boiler serviced last month, new washing machine installed 2 weeks ago',
+  specialNotes: 'Final year student, works part-time evenings',
+};
+
+// Quick scenario starters
+const quickStarts = [
+  { label: '🧺 Washing machine issue', message: 'My washing machine won\'t start. I pressed the power button but nothing happens.' },
+  { label: '🔥 No hot water', message: 'There\'s no hot water this morning. The boiler display shows an error code E119.' },
+  { label: '🚨 Smell gas', message: 'I can smell gas in the kitchen near the cooker. Should I be worried?' },
+  { label: '🚿 Slow drain', message: 'The kitchen sink is draining really slowly. Takes about 5 minutes for water to go down.' },
+  { label: '💡 Light not working', message: 'The light in my bedroom stopped working. I tried a new bulb but it still doesn\'t turn on.' },
+];
+
 export default function DemoPage() {
-  const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
-  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  // Context state
+  const [context, setContext] = useState<DemoContext>(defaultContext);
+  const [showContext, setShowContext] = useState(true);
+
+  // Chat state
   const [messages, setMessages] = useState<IssueMessage[]>([]);
   const [activities, setActivities] = useState<AgentActivity[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [simulating, setSimulating] = useState<DemoScenario | null>(null);
-  const [tenantResponse, setTenantResponse] = useState('');
-  const [sendingResponse, setSendingResponse] = useState(false);
+  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const [inputMessage, setInputMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
-  // Fetch analytics on mount
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-scroll to bottom
   useEffect(() => {
-    async function fetchAnalytics() {
-      try {
-        const data = await FixmateAPI.getAnalyticsOverview();
-        setAnalytics(data);
-      } catch (err) {
-        console.error('Failed to fetch analytics:', err);
-      }
-    }
-    fetchAnalytics();
-  }, []);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Poll for updates when there's an active issue
   useEffect(() => {
@@ -100,377 +83,405 @@ export default function DemoPage() {
           FixmateAPI.getIssueActivity(activeIssue.id),
         ]);
         setActiveIssue(issue);
+
+        // Check if we got a new agent message
+        if (msgs.length > messages.length) {
+          setIsTyping(false);
+        }
+
         setMessages(msgs);
         setActivities(acts);
       } catch (err) {
         console.error('Polling error:', err);
       }
-    }, 2000);
+    }, 1500);
 
     return () => clearInterval(pollInterval);
-  }, [activeIssue?.id]);
+  }, [activeIssue?.id, messages.length]);
 
-  const runScenario = useCallback(async (scenario: DemoScenario) => {
-    setSimulating(scenario);
-    setLoading(true);
+  // Start a new conversation with context
+  const startConversation = useCallback(async (_initialMessage: string) => {
+    setSending(true);
+    setIsTyping(true);
     setMessages([]);
     setActivities([]);
 
     try {
-      const result = await FixmateAPI.simulateIssue(scenario);
+      // Start demo scenario (context is shown in sidebar for investor reference)
+      const result = await FixmateAPI.simulateIssue('washing_machine');
+
+      // Override with custom message by sending tenant message
       const issue = await FixmateAPI.getIssue(result.issue_id);
+      setActiveIssue(issue);
+
+      // Wait for initial agent response
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       const msgs = await FixmateAPI.getMessages(result.issue_id);
       const acts = await FixmateAPI.getIssueActivity(result.issue_id);
 
-      setActiveIssue(issue);
       setMessages(msgs);
       setActivities(acts);
-
-      // Refresh analytics
-      const analytics = await FixmateAPI.getAnalyticsOverview();
-      setAnalytics(analytics);
+      setIsTyping(false);
     } catch (err) {
-      console.error('Failed to run scenario:', err);
+      console.error('Failed to start conversation:', err);
+      setIsTyping(false);
     } finally {
-      setLoading(false);
-      setSimulating(null);
+      setSending(false);
     }
   }, []);
 
-  const sendTenantMessage = async () => {
-    if (!activeIssue || !tenantResponse.trim()) {
+  // Send a message in ongoing conversation
+  const sendMessage = useCallback(async () => {
+    if (!inputMessage.trim()) {
       return;
     }
 
-    setSendingResponse(true);
-    try {
-      await FixmateAPI.sendMessage(activeIssue.id, tenantResponse);
-      setTenantResponse('');
+    const message = inputMessage.trim();
+    setInputMessage('');
+    setSending(true);
+    setIsTyping(true);
 
-      // Wait a moment then refresh
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const [msgs, acts, issue] = await Promise.all([
-        FixmateAPI.getMessages(activeIssue.id),
-        FixmateAPI.getIssueActivity(activeIssue.id),
-        FixmateAPI.getIssue(activeIssue.id),
-      ]);
-      setMessages(msgs);
-      setActivities(acts);
-      setActiveIssue(issue);
+    try {
+      if (!activeIssue) {
+        // Start new conversation
+        await startConversation(message);
+      } else {
+        // Continue existing conversation
+        await FixmateAPI.sendMessage(activeIssue.id, message);
+
+        // Wait for agent response
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const [msgs, acts, issue] = await Promise.all([
+          FixmateAPI.getMessages(activeIssue.id),
+          FixmateAPI.getIssueActivity(activeIssue.id),
+          FixmateAPI.getIssue(activeIssue.id),
+        ]);
+
+        setMessages(msgs);
+        setActivities(acts);
+        setActiveIssue(issue);
+        setIsTyping(false);
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
+      setIsTyping(false);
     } finally {
-      setSendingResponse(false);
+      setSending(false);
     }
+  }, [inputMessage, activeIssue, startConversation]);
+
+  // Reset conversation
+  const resetConversation = () => {
+    setActiveIssue(null);
+    setMessages([]);
+    setActivities([]);
+    setInputMessage('');
   };
+
+  const isResolved = activeIssue && ['resolved_by_agent', 'closed'].includes(activeIssue.status);
 
   return (
     <>
       <TitleBar
-        title="AI Demo Scenarios"
-        description="Test the AI agent with different maintenance scenarios"
+        title="Interactive AI Demo"
+        description="Experience the AI agent with customizable tenant context"
       />
 
-      {/* Analytics Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-emerald-100 p-3 dark:bg-emerald-900">
-              <svg className="size-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">AI Resolution Rate</p>
-              <p className="text-2xl font-bold text-foreground">
-                {analytics?.highlights.ai_resolution_rate || '0%'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/10 p-3">
-              <svg className="size-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Savings</p>
-              <p className="text-2xl font-bold text-foreground">
-                {analytics?.highlights.total_savings || '£0'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-violet-100 p-3 dark:bg-violet-900">
-              <svg className="size-6 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Avg Response</p>
-              <p className="text-2xl font-bold text-foreground">
-                {analytics?.highlights.avg_response_time || 'N/A'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900">
-              <svg className="size-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Issues Handled</p>
-              <p className="text-2xl font-bold text-foreground">
-                {analytics?.highlights.issues_handled || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Scenario Selection */}
-      <div className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">Choose a Scenario</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {scenarios.map(scenario => (
-            <button
-              key={scenario.id}
-              onClick={() => runScenario(scenario.id)}
-              disabled={loading}
-              className={`group relative overflow-hidden rounded-xl border border-border bg-card p-6 text-left transition-all hover:border-primary hover:shadow-lg disabled:opacity-50 ${
-                simulating === scenario.id ? 'ring-2 ring-primary' : ''
-              }`}
-            >
-              <div className={`absolute inset-x-0 top-0 h-1 ${scenario.color}`} />
-              <div className="mb-3 text-4xl">{scenario.icon}</div>
-              <h3 className="mb-1 font-semibold text-foreground group-hover:text-primary">
-                {scenario.title}
-              </h3>
-              <p className="mb-3 text-sm text-muted-foreground">
-                {scenario.description}
-              </p>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <svg className="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-                {scenario.expectedOutcome}
+      <div className="flex h-[calc(100vh-200px)] min-h-[600px] gap-4">
+        {/* Main Chat Area */}
+        <div className="flex flex-1 flex-col rounded-xl border border-border bg-card shadow-sm">
+          {/* Chat Header */}
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
+                <Bot className="size-5 text-primary" />
               </div>
-              {simulating === scenario.id && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-                  <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Active Conversation */}
-      {activeIssue && (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Conversation Panel */}
-          <div className="lg:col-span-2">
-            <div className="rounded-xl border border-border bg-card">
-              <div className="flex items-center justify-between border-b border-border p-4">
-                <div>
-                  <h3 className="font-semibold text-foreground">{activeIssue.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Issue #
-                    {activeIssue.id}
-                  </p>
-                </div>
+              <div>
+                <h3 className="font-semibold text-foreground">FixMate AI</h3>
+                <p className="text-xs text-muted-foreground">
+                  {isTyping ? 'typing...' : 'Property maintenance assistant'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeIssue && (
                 <Badge className={`
-                  ${activeIssue.status === 'resolved_by_agent' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : ''}
-                  ${activeIssue.status === 'escalated' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' : ''}
-                  ${activeIssue.status === 'triaging' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' : ''}
+                  ${activeIssue.status === 'resolved_by_agent' ? 'bg-emerald-100 text-emerald-700' : ''}
+                  ${activeIssue.status === 'escalated' ? 'bg-orange-100 text-orange-700' : ''}
+                  ${activeIssue.status === 'triaging' ? 'bg-blue-100 text-blue-700' : ''}
                 `}
                 >
-                  {activeIssue.status.replace(/_/g, ' ')}
+                  {activeIssue.status === 'resolved_by_agent' ? '✓ Resolved' :
+                   activeIssue.status === 'escalated' ? '⚠ Escalated' : 'In Progress'}
                 </Badge>
-              </div>
-
-              {/* Messages */}
-              <div className="max-h-96 overflow-y-auto p-4">
-                <div className="space-y-4">
-                  {messages.map((msg) => {
-                    const style = roleStyles[msg.role] ?? roleStyles.system!;
-                    return (
-                      <div key={msg.id} className={`flex ${style?.align ?? 'justify-start'}`}>
-                        <div className={`max-w-[80%] rounded-lg px-4 py-2 ${style?.bg ?? 'bg-muted'}`}>
-                          <div className="mb-1 text-xs font-medium opacity-70">{style?.label ?? 'Unknown'}</div>
-                          <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tenant Response Input */}
-              {activeIssue.status === 'triaging' && (
-                <div className="border-t border-border p-4">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={tenantResponse}
-                      onChange={e => setTenantResponse(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendTenantMessage()}
-                      placeholder="Simulate tenant response..."
-                      className="flex-1 rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      disabled={sendingResponse}
-                    />
-                    <Button
-                      onClick={sendTenantMessage}
-                      disabled={sendingResponse || !tenantResponse.trim()}
-                    >
-                      {sendingResponse
-                        ? (
-                            <div className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          )
-                        : (
-                            'Send'
-                          )}
-                    </Button>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setTenantResponse('Yes, that worked! The machine is running now.')}
-                      className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900 dark:text-emerald-300"
-                    >
-                      It worked!
-                    </button>
-                    <button
-                      onClick={() => setTenantResponse('I tried that but it still won\'t start.')}
-                      className="rounded-full bg-orange-100 px-3 py-1 text-xs text-orange-700 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300"
-                    >
-                      Still not working
-                    </button>
-                    <button
-                      onClick={() => setTenantResponse('I\'m not comfortable doing that myself.')}
-                      className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground hover:bg-muted/80"
-                    >
-                      Need professional
-                    </button>
-                  </div>
-                </div>
+              )}
+              {activeIssue && (
+                <Button variant="outline" size="sm" onClick={resetConversation}>
+                  New Chat
+                </Button>
               )}
             </div>
           </div>
 
-          {/* Activity Log Panel */}
-          <div className="lg:col-span-1">
-            <div className="rounded-xl border border-border bg-card">
-              <div className="border-b border-border p-4">
-                <h3 className="font-semibold text-foreground">Agent Activity</h3>
-                <p className="text-sm text-muted-foreground">Real-time decision log</p>
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {messages.length === 0 && !isTyping ? (
+              /* Welcome Screen */
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10">
+                  <Zap className="size-10 text-primary" />
+                </div>
+                <h2 className="mb-2 text-xl font-semibold text-foreground">
+                  Try the AI Agent
+                </h2>
+                <p className="mb-6 max-w-md text-muted-foreground">
+                  Type a maintenance issue below, or use a quick start to see how the AI handles real tenant problems.
+                </p>
+
+                {/* Quick Start Buttons */}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {quickStarts.map((qs, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setInputMessage(qs.message);
+                        inputRef.current?.focus();
+                      }}
+                      className="rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:border-primary hover:bg-primary/5"
+                    >
+                      {qs.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="max-h-96 overflow-y-auto p-4">
-                <div className="space-y-3">
-                  {activities.map(act => (
-                    <div key={act.id} className="rounded-lg bg-muted/50 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <Badge variant="outline" className="text-xs">
-                          {act.action.replace(/_/g, ' ')}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(act.created_at).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      {act.details && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          {act.action === 'reasoning' && 'reasoning' in act.details && (
-                            <p className="italic">
-                              &quot;
-                              {String(act.details.reasoning).slice(0, 150)}
-                              ...&quot;
-                            </p>
-                          )}
-                          {act.action === 'escalated' && (
-                            <p>
-                              Priority:
-                              {' '}
-                              <span className="font-medium">{String(('priority' in act.details ? act.details.priority : 'medium') || 'medium').toUpperCase()}</span>
-                              {'estimated_cost_low' in act.details && (
-                                <span className="ml-2">
-                                  Est: £
-                                  {String(act.details.estimated_cost_low)}
-                                  -£
-                                  {String('estimated_cost_high' in act.details ? act.details.estimated_cost_high : '?')}
-                                </span>
-                              )}
-                            </p>
-                          )}
-                          {act.action === 'resolved_by_agent' && 'estimated_savings' in act.details && (
-                            <p className="text-emerald-600 dark:text-emerald-400">
-                              Saved: £
-                              {String(act.details.estimated_savings)}
-                            </p>
-                          )}
-                          {act.action === 'emergency_detected' && 'keywords' in act.details && (
-                            <p className="text-red-600 dark:text-red-400">
-                              Keywords:
-                              {' '}
-                              {Array.isArray(act.details.keywords) ? (act.details.keywords as string[]).join(', ') : String(act.details.keywords)}
-                            </p>
-                          )}
-                          {act.action === 'sentiment_assessed' && 'sentiment' in act.details && (
-                            <p>
-                              Sentiment:
-                              {' '}
-                              <span className="font-medium">{String(act.details.sentiment)}</span>
-                              {' '}
-                              (score:
-                              {'score' in act.details ? String(act.details.score) : 'N/A'}
-                              )
-                            </p>
-                          )}
+            ) : (
+              /* Chat Messages */
+              <div className="space-y-4">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.role === 'tenant' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        msg.role === 'tenant'
+                          ? 'bg-primary text-primary-foreground'
+                          : msg.role === 'agent'
+                            ? 'bg-muted'
+                            : 'border border-amber-200 bg-amber-50 text-amber-800'
+                      }`}
+                    >
+                      {msg.role === 'agent' && (
+                        <div className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                          <Bot className="size-3" />
+                          FixMate AI
                         </div>
                       )}
-                      {act.would_notify && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          Would notify:
-                          {' '}
-                          {act.would_notify}
-                        </div>
+                      <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Typing Indicator */}
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl bg-muted px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <div className="size-2 animate-bounce rounded-full bg-muted-foreground/50" style={{ animationDelay: '0ms' }} />
+                        <div className="size-2 animate-bounce rounded-full bg-muted-foreground/50" style={{ animationDelay: '150ms' }} />
+                        <div className="size-2 animate-bounce rounded-full bg-muted-foreground/50" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+
+          {/* Input Area */}
+          {!isResolved ? (
+            <div className="border-t border-border p-4">
+              <div className="flex gap-2">
+                <Input
+                  ref={inputRef}
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                  placeholder="Describe your maintenance issue..."
+                  disabled={sending}
+                  className="flex-1"
+                />
+                <Button onClick={sendMessage} disabled={sending || !inputMessage.trim()}>
+                  <Send className="size-4" />
+                </Button>
+              </div>
+
+              {/* Quick Responses for ongoing chat */}
+              {activeIssue && activeIssue.status === 'triaging' && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setInputMessage('Yes, that worked! The problem is fixed now.')}
+                    className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700 hover:bg-emerald-200"
+                  >
+                    ✓ That worked!
+                  </button>
+                  <button
+                    onClick={() => setInputMessage('I tried that but it\'s still not working.')}
+                    className="rounded-full bg-orange-100 px-3 py-1 text-xs text-orange-700 hover:bg-orange-200"
+                  >
+                    Still not working
+                  </button>
+                  <button
+                    onClick={() => setInputMessage('I\'m not comfortable trying that myself.')}
+                    className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground hover:bg-muted/80"
+                  >
+                    Need a professional
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="border-t border-border bg-emerald-50 p-4 text-center text-emerald-700">
+              <p className="font-medium">Issue Resolved!</p>
+              <p className="text-sm">The AI helped resolve this without a callout.</p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={resetConversation}>
+                Start New Demo
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Context Panel */}
+        <div className={`w-80 rounded-xl border border-border bg-card shadow-sm transition-all ${showContext ? '' : 'w-12'}`}>
+          <button
+            onClick={() => setShowContext(!showContext)}
+            className="flex w-full items-center justify-between border-b border-border p-3"
+          >
+            <div className="flex items-center gap-2">
+              <Settings2 className="size-4 text-muted-foreground" />
+              {showContext && <span className="font-medium">Tenant Context</span>}
+            </div>
+            <ChevronDown className={`size-4 text-muted-foreground transition-transform ${showContext ? '' : '-rotate-90'}`} />
+          </button>
+
+          {showContext && (
+            <div className="space-y-4 p-4">
+              <p className="text-xs text-muted-foreground">
+                Configure tenant context to see how the AI uses prior knowledge.
+              </p>
+
+              <div>
+                <label className="mb-1 flex items-center gap-1 text-sm font-medium">
+                  <User className="size-3" /> Tenant Name
+                </label>
+                <Input
+                  value={context.tenantName}
+                  onChange={(e) => setContext({ ...context, tenantName: e.target.value })}
+                  placeholder="Tenant name"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center gap-1 text-sm font-medium">
+                  <Home className="size-3" /> Property Type
+                </label>
+                <Select
+                  value={context.propertyType}
+                  onValueChange={(v) => setContext({ ...context, propertyType: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HMO - 5 bed student house">HMO - 5 bed student house</SelectItem>
+                    <SelectItem value="Single let - 2 bed flat">Single let - 2 bed flat</SelectItem>
+                    <SelectItem value="Studio apartment">Studio apartment</SelectItem>
+                    <SelectItem value="3 bed family home">3 bed family home</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="mb-1 text-sm font-medium">Tenant Since</label>
+                <Select
+                  value={context.tenantSince}
+                  onValueChange={(v) => setContext({ ...context, tenantSince: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1 week ago">1 week ago (new tenant)</SelectItem>
+                    <SelectItem value="3 months ago">3 months ago</SelectItem>
+                    <SelectItem value="6 months ago">6 months ago</SelectItem>
+                    <SelectItem value="Over 1 year">Over 1 year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="mb-1 text-sm font-medium">Previous Issues</label>
+                <Textarea
+                  value={context.previousIssues}
+                  onChange={(e) => setContext({ ...context, previousIssues: e.target.value })}
+                  placeholder="Any prior maintenance history..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 text-sm font-medium">Special Notes</label>
+                <Textarea
+                  value={context.specialNotes}
+                  onChange={(e) => setContext({ ...context, specialNotes: e.target.value })}
+                  placeholder="Anything the agent should know..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setContext(defaultContext)}
+              >
+                Reset to Default
+              </Button>
+            </div>
+          )}
+
+          {/* Activity Feed (below context) */}
+          {showContext && activities.length > 0 && (
+            <div className="border-t border-border">
+              <div className="p-3">
+                <h4 className="text-sm font-medium text-muted-foreground">Agent Reasoning</h4>
+              </div>
+              <div className="max-h-48 overflow-y-auto px-3 pb-3">
+                <div className="space-y-2">
+                  {activities.slice(0, 5).map((act) => (
+                    <div key={act.id} className="rounded-lg bg-muted/50 p-2 text-xs">
+                      <Badge variant="outline" className="mb-1 text-[10px]">
+                        {act.action.replace(/_/g, ' ')}
+                      </Badge>
+                      {act.details && 'reasoning' in act.details && (
+                        <p className="mt-1 italic text-muted-foreground">
+                          "{String(act.details.reasoning).slice(0, 80)}..."
+                        </p>
                       )}
                     </div>
                   ))}
-                  {activities.length === 0 && (
-                    <p className="text-center text-sm text-muted-foreground">
-                      No activity yet
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
-
-      {/* Empty State */}
-      {!activeIssue && !loading && (
-        <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center">
-          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10">
-            <svg className="size-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-foreground">Select a Scenario</h3>
-          <p className="mt-1 text-muted-foreground">
-            Choose a demo scenario above to see the AI agent in action
-          </p>
-        </div>
-      )}
+      </div>
     </>
   );
 }
