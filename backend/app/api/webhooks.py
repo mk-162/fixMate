@@ -310,9 +310,11 @@ async def process_twilio_message(
     if conversation:
         # Continue existing conversation
         issue_id = conversation["issue_id"]
+        print(f"[PROCESS] Continuing conversation for issue {issue_id}", flush=True)
 
         # QUICK WIN: Send instant acknowledgment
-        await twilio_client.send_message(phone, "Got it, let me check on that...")
+        ack_result = await twilio_client.send_message(phone, "Got it, let me check on that...")
+        print(f"[PROCESS] Ack send result: {ack_result}", flush=True)
 
         # Record the message
         await messages.add_message(issue_id, "tenant", body)
@@ -330,11 +332,14 @@ async def process_twilio_message(
 
         # Trigger agent response
         try:
-            await triage_agent.handle_tenant_response(issue_id, body)
-            await send_twilio_agent_response(issue_id, phone)
+            print(f"[PROCESS] Calling agent for issue {issue_id}", flush=True)
+            agent_result = await triage_agent.handle_tenant_response(issue_id, body)
+            print(f"[PROCESS] Agent result: {agent_result}", flush=True)
+            response_result = await send_twilio_agent_response(issue_id, phone)
+            print(f"[PROCESS] Response send result: {response_result}", flush=True)
 
         except Exception as e:
-            print(f"ERROR in process_twilio_message: {e}")
+            print(f"[PROCESS] ERROR in process_twilio_message: {e}", flush=True)
             await activity.log_activity(
                 issue_id,
                 "agent_error",
