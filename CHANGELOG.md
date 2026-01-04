@@ -1,3 +1,11 @@
+## [1.12.1](https://github.com/mk-162/fixMate/compare/v1.12.0...v1.12.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* add logging to send_twilio_agent_response ([fb14360](https://github.com/mk-162/fixMate/commit/fb1436034cf96adf405525331bdb796bc0f2e35a))
+* handle missing closed_at column gracefully ([c391d21](https://github.com/mk-162/fixMate/commit/c391d211381d21d8bf1c9e10689dc109f3fe44f0))
+
 # [1.12.0](https://github.com/mk-162/fixMate/compare/v1.11.1...v1.12.0) (2026-01-04)
 
 
