@@ -1,3 +1,10 @@
+## [1.14.2](https://github.com/mk-162/fixMate/compare/v1.14.1...v1.14.2) (2026-01-04)
+
+
+### Bug Fixes
+
+* resolve duplicate messages, new issue flow, and name parsing ([bec782e](https://github.com/mk-162/fixMate/commit/bec782e9f01841c9279eb0d8f49de0d03a0d276d))
+
 ## [1.14.1](https://github.com/mk-162/fixMate/compare/v1.14.0...v1.14.1) (2026-01-04)
 
 
