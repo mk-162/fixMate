@@ -471,7 +471,7 @@ async def complete_registration(phone: str, body: str, property: dict, pending: 
 async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
     """Handle a new issue reported via Twilio WhatsApp."""
     from app.db.database import fetch_all
-    print(f"Handling new Twilio issue from {phone}")
+    print(f"[NEW ISSUE] Handling new Twilio issue from {phone}", flush=True)
 
     # Try to find tenant by phone number
     try:
@@ -485,7 +485,7 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
         return
 
     if not tenant:
-        print(f"Tenant not found for {phone}. Sending registration prompt.")
+        print(f"[NEW ISSUE] Tenant not found for {phone}. Sending registration prompt.", flush=True)
 
         # Get available properties to show the user
         try:
@@ -520,7 +520,7 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
             )
 
         result = await twilio_client.send_message(phone, message)
-        print(f"Registration prompt result: {result}")
+        print(f"[NEW ISSUE] Registration prompt result: {result}", flush=True)
 
         # Create a pending registration conversation
         await whatsapp_conversations.create_pending_registration(
@@ -530,7 +530,7 @@ async def handle_new_twilio_issue(phone: str, body: str, message_sid: str):
         )
         return
 
-    print(f"Found tenant {tenant['id']}. Creating issue.")
+    print(f"[NEW ISSUE] Found tenant {tenant['id']}. Creating issue.", flush=True)
 
     # QUICK WIN: Instant acknowledgment for known users
     property_name = tenant.get("property_name", "your property")
