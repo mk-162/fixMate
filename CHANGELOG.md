@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/mk-162/fixMate/compare/v1.11.0...v1.11.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* add detailed logging to trace message flow ([67069ee](https://github.com/mk-162/fixMate/commit/67069ee5ac2ed94b4e7ef476f02c1b2365f6e25f))
+
 # [1.11.0](https://github.com/mk-162/fixMate/compare/v1.10.1...v1.11.0) (2026-01-04)
 
 
