@@ -682,10 +682,13 @@ async def twilio_webhook(
 
 async def process_twilio_message_with_logging(from_number: str, body: str, message_sid: str):
     """Wrapper to catch and log all errors in background task."""
+    import sys
     try:
-        print(f"[BACKGROUND] Starting to process message from {from_number}")
+        print(f"[BACKGROUND] Starting to process message from {from_number}", flush=True)
+        sys.stdout.flush()
         await process_twilio_message(from_number, body, message_sid)
-        print(f"[BACKGROUND] Finished processing message from {from_number}")
+        print(f"[BACKGROUND] Finished processing message from {from_number}", flush=True)
+        sys.stdout.flush()
     except Exception as e:
         print(f"[BACKGROUND ERROR] Failed to process message: {e}")
         import traceback
