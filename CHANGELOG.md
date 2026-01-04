@@ -1,3 +1,15 @@
+# [1.12.0](https://github.com/mk-162/fixMate/compare/v1.11.1...v1.12.0) (2026-01-04)
+
+
+### Bug Fixes
+
+* add logging for twilio send and agent calls ([9847266](https://github.com/mk-162/fixMate/commit/984726615e43ab3419f6fc9829a56c47746cd5ff))
+
+
+### Features
+
+* redesign demo page as interactive chat interface ([23e4cdc](https://github.com/mk-162/fixMate/commit/23e4cdcafa0069c0940b901281802a90600ef8de))
+
 ## [1.11.1](https://github.com/mk-162/fixMate/compare/v1.11.0...v1.11.1) (2026-01-04)
 
 
