@@ -1,3 +1,16 @@
+# [1.11.0](https://github.com/mk-162/fixMate/compare/v1.10.1...v1.11.0) (2026-01-04)
+
+
+### Bug Fixes
+
+* add flush=True to webhook logging for Railway visibility ([f489136](https://github.com/mk-162/fixMate/commit/f489136fe829c45ebc4c0287fa78fe2ba7e53812))
+* auto-create agent_muted column if missing ([3867c60](https://github.com/mk-162/fixMate/commit/3867c603c33bbb48eb966f2db9a0f321b59d2973))
+
+
+### Features
+
+* add issue management features like task manager ([331a609](https://github.com/mk-162/fixMate/commit/331a6093ddf22492594853809dbde0be620f90e9))
+
 ## [1.10.1](https://github.com/mk-162/fixMate/compare/v1.10.0...v1.10.1) (2026-01-04)
 
 
