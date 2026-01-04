@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/mk-162/fixMate/compare/v1.12.1...v1.12.2) (2026-01-04)
+
+
+### Bug Fixes
+
+* add logging to see twilio from/to numbers ([7f3e51d](https://github.com/mk-162/fixMate/commit/7f3e51d01688c2e66df882126e552d9e824139f7))
+
 ## [1.12.1](https://github.com/mk-162/fixMate/compare/v1.12.0...v1.12.1) (2026-01-04)
 
 
