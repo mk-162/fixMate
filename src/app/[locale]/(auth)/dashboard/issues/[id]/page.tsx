@@ -104,7 +104,8 @@ export default function IssueDetailPage() {
   }, [fetchData]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll within the messages container only, not the whole page
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages]);
 
   async function handleSendMessage(e: React.FormEvent) {
@@ -231,7 +232,7 @@ export default function IssueDetailPage() {
             </div>
           )}
 
-          <div className="flex h-[600px] flex-col rounded-lg bg-white shadow">
+          <div className="flex min-h-[500px] flex-col rounded-lg bg-white shadow lg:h-[calc(100vh-220px)]">
             {/* Messages */}
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
               {messages.map(msg => (
