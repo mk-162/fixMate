@@ -356,7 +356,7 @@ export default function DemoPage() {
         </div>
 
         {/* Context Panel */}
-        <div className={`w-80 rounded-xl border border-border bg-card shadow-sm transition-all ${showContext ? '' : 'w-12'}`}>
+        <div className={`w-80 overflow-y-auto rounded-xl border border-border bg-card shadow-sm transition-all ${showContext ? '' : 'w-12'}`}>
           <button
             onClick={() => setShowContext(!showContext)}
             className="flex w-full items-center justify-between border-b border-border p-3"
