@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/mk-162/fixMate/compare/v1.7.0...v1.8.0) (2026-01-04)
+
+
+### Features
+
+* add Tier 1 landlord features for enhanced demo ([2abe295](https://github.com/mk-162/fixMate/commit/2abe2951c86873c6fe180973d3277ac6099a03f3))
+
 # [1.7.0](https://github.com/mk-162/fixMate/compare/v1.6.0...v1.7.0) (2026-01-03)
 
 
