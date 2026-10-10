@@ -100,7 +100,7 @@
     "@vitest/coverage-v8": "^2.1.9",
     "@vitest/expect": "^2.1.9",
     "autoprefixer": "^10.4.20",
-    "checkly": "^4.9.0",
+    "checkly": "^9.5.0",
     "commitizen": "^4.3.1",
     "cross-env": "^7.0.3",
     "cssnano": "^7.0.6",
